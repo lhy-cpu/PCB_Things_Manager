@@ -1,0 +1,356 @@
+{% extends 'base.html' %}
+
+{% block header %}{{ _('inv_header', 'Inventory') }}{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h3>{{ _('inv_add_title', 'Add New Component') }}</h3>
+    <form method="POST" action="{{ url_for('inventory') }}">
+        <div class="form-group">
+            <label>{{ _('inv_model_label', 'Model/Value') }}</label>
+            <input type="text" name="model" placeholder="{{ _('inv_model_ph', 'Model/Value') }}" required>
+        </div>
+        <div class="form-group">
+            <label>{{ _('inv_footprint_label', 'Footprint') }}</label>
+            <input type="text" name="footprint" placeholder="{{ _('inv_footprint_ph', 'Footprint') }}">
+        </div>
+
+        <!-- P Category -->
+        <div class="form-group">
+            <label>{{ _('inv_primary_cat', 'Primary Category') }}</label>
+            <div style="display: flex; gap: 10px;">
+                <select id="p_select" name="primary_category_select" onchange="onPrimaryChange()" style="flex:1;">
+                    <option value="">{{ _('inv_select_primary', '-- Select or Type New --') }}</option>
+                    {% for p_name, s_list in cat_tree.items() %}
+                    <option value="{{ p_name }}">{{ p_name }}</option>
+                    {% endfor %}
+                    <option value="__NEW__" style="font-weight: bold; color: blue;">{{ _('inv_new_option', '+ New / Type...') }}</option>
+                </select>
+                <input type="text" id="p_manual" name="primary_category_manual" placeholder="{{ _('inv_type_new_primary', 'Type new Primary Category') }}" style="display: none; flex: 1;">
+            </div>
+        </div>
+
+        <!-- S Category -->
+        <div class="form-group">
+            <label>{{ _('inv_secondary_cat', 'Secondary Category') }}</label>
+            <div style="display: flex; gap: 10px;">
+                <select id="s_select" name="secondary_category_select" onchange="onSecondaryChange()" style="flex:1;">
+                    <option value="">{{ _('inv_select_secondary_default', '-- Select Primary First --') }}</option>
+                </select>
+                <input type="text" id="s_manual" name="secondary_category_manual" placeholder="{{ _('inv_type_new_secondary', 'Type new Secondary Category') }}" style="display: none; flex: 1;">
+            </div>
+        </div>
+        
+        <div class="form-group">
+            <label>{{ _('inv_supplier_label', 'Supplier Part Number') }}</label>
+            <input type="text" name="supplier_part" placeholder="{{ _('inv_supplier_ph', 'Supplier Part Number') }}">
+        </div>
+        <div class="form-group">
+            <label>{{ _('inv_qty_label', 'Initial Quantity') }}</label>
+            <input type="number" name="quantity" placeholder="{{ _('inv_qty_ph', 'Initial Quantity') }}" value="0" required>
+        </div>
+        <div class="form-group">
+            <label>{{ _('inv_remark_label', 'Remark') }}</label>
+            <textarea name="remark" placeholder="{{ _('inv_remark_ph', 'Any notes...') }}" style="width: 100%; height: 60px; resize: vertical; border: 1px solid #ddd; border-radius: 4px; padding: 0.5rem;"></textarea>
+        </div>
+        <button type="submit" name="add" class="btn btn-primary">{{ _('inv_btn_add', 'Add Component') }}</button>
+    </form>
+</div>
+
+<div class="card">
+    <h3>{{ _('inv_current_stock', 'Current Stock') }}</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>{{ _('th_id', 'ID') }}</th>
+                <th>{{ _('th_model', 'Model') }}</th>
+                <th>{{ _('th_footprint', 'Footprint') }}</th>
+                <th>{{ _('th_category', 'Category') }}</th>
+                <th>{{ _('th_supplier', 'Supplier Part') }}</th>
+                <th>{{ _('th_remark', 'Remark') }}</th>
+                <th>{{ _('th_actions', 'Actions') }}</th>
+                <th>{{ _('th_stock', 'Current Stock') }}</th>
+                <th>{{ _('th_delete', 'Delete') }}</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for c in components %}
+            <tr id="row-{{ c.id }}" 
+                data-model="{{ c.model }}" 
+                data-footprint="{{ c.footprint or '' }}" 
+                data-pcat="{{ c.primary_category or '' }}" 
+                data-scat="{{ c.secondary_category or '' }}" 
+                data-supplier="{{ c.supplier_part or '' }}"
+                data-remark="{{ c.remark or '' }}">
+                <td>{{ c.id }}</td>
+                <td>{{ c.model }}</td>
+                <td>{{ c.footprint or '' }}</td>
+                <td>
+                    {% if c.primary_category %}
+                        {{ c.primary_category }} 
+                        {% if c.secondary_category %} / {{ c.secondary_category }}{% endif %}
+                    {% endif %}
+                </td>
+                <td>{{ c.supplier_part or '' }}</td>
+                <td>{{ c.remark or '' }}</td>
+                <td>
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="openEditModal('{{ c.id }}')">{{ _('btn_edit', 'Edit') }}</button>
+                    <form method="POST" style="display:inline;">
+                        <input type="hidden" name="component_id" value="{{ c.id }}">
+                        <input type="number" name="change_amount" placeholder="+/-" style="width: 60px" required>
+                        <input type="text" name="note" placeholder="Reason" style="width: 100px">
+                        <button type="submit" name="update_stock" class="btn btn-secondary btn-sm">{{ _('btn_update', 'Update') }}</button>
+                    </form>
+                </td>
+                <td>{{ c.current_quantity }}</td>
+                <td>
+                    <form method="POST" style="display:inline;" onsubmit="return confirm('{{ _('msg_confirm_delete', 'Delete this component?') }}');">
+                        <input type="hidden" name="component_id" value="{{ c.id }}">
+                        <button type="submit" name="delete" class="btn btn-danger btn-sm">{{ _('btn_delete', 'Delete') }}</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+
+<!-- Edit Modal -->
+<div id="editModal" class="modal">
+  <div class="modal-content">
+    <span class="close" onclick="closeEditModal()">&times;</span>
+    <h3>{{ _('modal_edit_title', 'Edit Component') }}</h3>
+    <form method="POST" action="{{ url_for('inventory') }}">
+        <input type="hidden" name="component_id" id="edit_id">
+        <input type="hidden" name="edit" value="true">
+        
+        <div class="form-group">
+            <label>{{ _('inv_model_label', 'Model/Value') }}</label>
+            <input type="text" id="edit_model" name="model" required>
+        </div>
+        <div class="form-group">
+            <label>{{ _('inv_footprint_label', 'Footprint') }}</label>
+            <input type="text" id="edit_footprint" name="footprint">
+        </div>
+
+        <!-- P Category (Edit) -->
+        <div class="form-group">
+            <label>{{ _('inv_primary_cat', 'Primary Category') }}</label>
+            <div style="display: flex; gap: 10px;">
+                <select id="edit_p_select" name="primary_category_select" onchange="onEditPrimaryChange()" style="flex:1;">
+                    <option value="">{{ _('inv_select_primary', '-- Select or Type New --') }}</option>
+                    {% for p_name, s_list in cat_tree.items() %}
+                    <option value="{{ p_name }}">{{ p_name }}</option>
+                    {% endfor %}
+                    <option value="__NEW__" style="font-weight: bold; color: blue;">{{ _('inv_new_option', '+ New / Type...') }}</option>
+                </select>
+                <input type="text" id="edit_p_manual" name="primary_category_manual" placeholder="{{ _('inv_type_new_primary', 'Type new Primary Category') }}" style="display: none; flex: 1;">
+            </div>
+        </div>
+
+        <!-- S Category (Edit) -->
+        <div class="form-group">
+            <label>{{ _('inv_secondary_cat', 'Secondary Category') }}</label>
+            <div style="display: flex; gap: 10px;">
+                <select id="edit_s_select" name="secondary_category_select" onchange="onEditSecondaryChange()" style="flex:1;">
+                    <option value="">{{ _('inv_select_secondary_default', '-- Select Primary First --') }}</option>
+                </select>
+                <input type="text" id="edit_s_manual" name="secondary_category_manual" placeholder="{{ _('inv_type_new_secondary', 'Type new Secondary Category') }}" style="display: none; flex: 1;">
+            </div>
+        </div>
+        
+        <div class="form-group">
+            <label>{{ _('inv_supplier_label', 'Supplier Part Number') }}</label>
+            <input type="text" id="edit_supplier" name="supplier_part">
+        </div>
+        
+        <div class="form-group">
+            <label>{{ _('inv_remark_label', 'Remark') }}</label>
+            <textarea id="edit_remark" name="remark" style="width: 100%; height: 60px; resize: vertical; border: 1px solid #ddd; border-radius: 4px; padding: 0.5rem;"></textarea>
+        </div>
+        
+        <div style="margin-top: 20px; text-align: right;">
+            <button type="button" class="btn btn-secondary" onclick="closeEditModal()">{{ _('btn_cancel', 'Cancel') }}</button>
+            <button type="submit" class="btn btn-primary">{{ _('btn_confirm_edit', 'Save Changes') }}</button>
+        </div>
+    </form>
+  </div>
+</div>
+
+<script>
+    const catData = {{ cat_tree|tojson }};
+    
+    // --- Add Form Logic ---
+    function onPrimaryChange() {
+        const pSelect = document.getElementById('p_select');
+        const pManual = document.getElementById('p_manual');
+        const sSelect = document.getElementById('s_select');
+        const sManual = document.getElementById('s_manual');
+        
+        if (pSelect.value === '__NEW__') {
+            pManual.style.display = 'block';
+            pManual.required = true;
+            
+            // Allow manual secondary
+            sSelect.innerHTML = '<option value="__NEW__" selected>Type New...</option>';
+            sSelect.disabled = true;
+            sManual.style.display = 'block';
+            sManual.required = true;
+        } else {
+            pManual.style.display = 'none';
+            pManual.required = false;
+            
+            sSelect.disabled = false;
+            sManual.style.display = 'none';
+            sManual.required = false;
+            
+            // Populate secondary
+            while(sSelect.options.length > 0) sSelect.remove(0);
+            
+            if (pSelect.value === '') {
+                const opt = new Option("-- Select Primary First --", "");
+                sSelect.add(opt);
+            } else {
+                const sList = catData[pSelect.value] || [];
+                const defaultOpt = new Option("-- Select Secondary --", "");
+                sSelect.add(defaultOpt);
+                
+                sList.forEach(s => {
+                    sSelect.add(new Option(s, s));
+                });
+                
+                const newOpt = new Option("+ New / Type...", "__NEW__");
+                newOpt.style.fontWeight = 'bold';
+                newOpt.style.color = 'blue';
+                sSelect.add(newOpt);
+            }
+        }
+    }
+    
+    function onSecondaryChange() {
+        const sSelect = document.getElementById('s_select');
+        const sManual = document.getElementById('s_manual');
+        
+        if (sSelect.value === '__NEW__') {
+            sManual.style.display = 'block';
+            sManual.required = true;
+        } else {
+            sManual.style.display = 'none';
+            sManual.required = false;
+        }
+    }
+
+    // --- Edit Modal Logic ---
+    var modal = document.getElementById("editModal");
+
+    function openEditModal(id) {
+        var row = document.getElementById('row-' + id);
+        
+        document.getElementById('edit_id').value = id;
+        document.getElementById('edit_model').value = row.getAttribute('data-model');
+        document.getElementById('edit_footprint').value = row.getAttribute('data-footprint');
+        document.getElementById('edit_supplier').value = row.getAttribute('data-supplier');
+        document.getElementById('edit_remark').value = row.getAttribute('data-remark');
+
+        var pCat = row.getAttribute('data-pcat');
+        var sCat = row.getAttribute('data-scat');
+
+        // Set Primary Category
+        var pSelect = document.getElementById('edit_p_select');
+        
+        // Check if category exists in current list (it should)
+        var exists = false;
+        for (var i = 0; i < pSelect.options.length; i++) {
+            if (pSelect.options[i].value === pCat) {
+                exists = true;
+                break;
+            }
+        }
+        
+        if (exists) {
+             pSelect.value = pCat;
+             onEditPrimaryChange(); // Populate secondary
+             
+             // Set Secondary Category
+             var sSelect = document.getElementById('edit_s_select');
+             setTimeout(function() { // Wait for population
+                 sSelect.value = sCat;
+                 if (sSelect.value !== sCat) {
+                     // If secondary not found in list (maybe manual but primary existed?), fallback
+                     // Simply select "New" and fill manual? Or add option dynamically?
+                     // For now assume consistency. If inconsistent, user can re-select.
+                 }
+             }, 0);
+             
+        } else {
+            // Very rare case: existing category not in tree?
+            // Fallback to manual mode
+            pSelect.value = "__NEW__";
+            onEditPrimaryChange();
+            document.getElementById('edit_p_manual').value = pCat;
+            document.getElementById('edit_s_manual').value = sCat;
+        }
+
+        modal.style.display = "block";
+    }
+
+    function closeEditModal() {
+        modal.style.display = "none";
+    }
+
+    window.onclick = function(event) {
+        if (event.target == modal) {
+            modal.style.display = "none";
+        }
+    }
+
+    function onEditPrimaryChange() {
+        const pSelect = document.getElementById('edit_p_select');
+        const pManual = document.getElementById('edit_p_manual');
+        const sSelect = document.getElementById('edit_s_select');
+        const sManual = document.getElementById('edit_s_manual');
+        
+        if (pSelect.value === '__NEW__') {
+            pManual.style.display = 'block';
+            // Allow manual secondary
+            sSelect.innerHTML = '<option value="__NEW__" selected>Type New...</option>';
+            sSelect.disabled = true;
+            sManual.style.display = 'block';
+        } else {
+            pManual.style.display = 'none';
+            sSelect.disabled = false;
+            sManual.style.display = 'none';
+            
+            // Populate secondary
+            while(sSelect.options.length > 0) sSelect.remove(0);
+            
+            const sList = catData[pSelect.value] || [];
+            const defaultOpt = new Option("-- Select Secondary --", "");
+            sSelect.add(defaultOpt);
+            
+            sList.forEach(s => {
+                sSelect.add(new Option(s, s));
+            });
+            
+            const newOpt = new Option("+ New / Type...", "__NEW__");
+            newOpt.style.fontWeight = 'bold';
+            newOpt.style.color = 'blue';
+            sSelect.add(newOpt);
+        }
+    }
+    
+    function onEditSecondaryChange() {
+        const sSelect = document.getElementById('edit_s_select');
+        const sManual = document.getElementById('edit_s_manual');
+        
+        if (sSelect.value === '__NEW__') {
+            sManual.style.display = 'block';
+        } else {
+            sManual.style.display = 'none';
+        }
+    }
+
+</script>
+
+{% endblock %}

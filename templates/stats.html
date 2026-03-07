@@ -1,0 +1,37 @@
+{% extends 'base.html' %}
+
+{% block header %}{{ _('stats_header', 'Inventory Statistics') }}{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h3>{{ _('stats_overview_title', 'Data Overview') }}</h3>
+    <table style="font-size: 0.9em;">
+        <thead>
+            <tr>
+                <th>{{ _('th_model', 'Component') }}</th>
+                <th>{{ _('th_footprint', 'Footprint') }}</th>
+                <th>{{ _('th_total_in', 'Total In (+)') }}</th>
+                <th>{{ _('th_total_out', 'Total Out (-)') }}</th>
+                <th>{{ _('th_reserved', 'Reserved (~)') }}</th>
+                <th>{{ _('th_phy_stock', 'Physical Stock') }}</th>
+                <th>{{ _('th_available', 'Available') }}</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for s in stats %}
+            <tr>
+                <td>{{ s.model }}</td>
+                <td>{{ s.footprint }}</td>
+                <td style="color: green">{{ s.total_in }}</td>
+                <td style="color: red">{{ s.total_out }}</td>
+                <td style="color: blue">{{ s.reserved }}</td>
+                <td style="font-weight: bold">{{ s.current_quantity }}</td>
+                <td style="font-weight: bold; background-color: {% if s.current_quantity - s.reserved < 0 %}#fdedec{% else %}#eafaf1{% endif %}">
+                    {{ s.current_quantity - s.reserved }}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

@@ -1,0 +1,16 @@
+{% extends 'base.html' %}
+
+{% block header %}{{ _('welcome_header', 'Welcome to PCB Things Manager') }}{% endblock %}
+
+{% block content %}
+<div class="card">
+    <p>{{ _('welcome_text', 'This is a simple inventory management system for electronic components.') }}</p>
+    <p>{{ _('welcome_list_intro', 'Using the sidebar, you can:') }}</p>
+    <ul>
+        <li>{{ _('welcome_list_1', 'Manage your component stock.') }}</li>
+        <li>{{ _('welcome_list_2', 'Upload BOM (Bill of Materials) CSV files.') }}</li>
+        <li>{{ _('welcome_list_3', 'Match BOM items to your inventory and perform batch check-outs.') }}</li>
+        <li>{{ _('welcome_list_4', 'View usage statistics.') }}</li>
+    </ul>
+</div>
+{% endblock %}

@@ -1,0 +1,56 @@
+{% extends 'base.html' %}
+
+{% block header %}{{ _('csv_header', 'BOM CSV Management') }}{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h3>{{ _('csv_upload_title', 'Upload New CSV') }}</h3>
+    <form method="POST" enctype="multipart/form-data">
+        <div class="form-group">
+            <input type="file" name="upload" accept=".csv" required>
+        </div>
+        <button type="submit" class="btn btn-primary">{{ _('btn_upload', 'Upload') }}</button>
+    </form>
+</div>
+
+<div class="card">
+    <h3>{{ _('csv_managed_title', 'Managed Files') }}</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>{{ _('th_display_name', 'Display Name') }}</th>
+                <th>{{ _('th_filename', 'Original Filename') }}</th>
+                <th>{{ _('th_date', 'Upload Date') }}</th>
+                <th>{{ _('th_actions', 'Actions') }}</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for f in files %}
+            <tr>
+                <td>
+                    <form method="POST" style="display: flex; gap: 10px;">
+                        <input type="hidden" name="file_id" value="{{ f.id }}">
+                        <input type="text" name="new_name" value="{{ f.display_name }}">
+                        <button type="submit" name="rename" class="btn btn-secondary btn-sm">{{ _('btn_rename', 'Rename') }}</button>
+                    </form>
+                </td>
+                <td>{{ f.filename }}</td>
+                <td>{{ f.upload_date }}</td>
+                <td>
+                    <div style="display: flex; gap: 5px; align-items: center;">
+                        <a href="{{ url_for('bom_match', file_id=f.id) }}" class="btn btn-success">{{ _('btn_view_checkout', 'View & Checkout') }}</a>
+                        
+                        <form method="POST" onsubmit="return confirm('{{ _('msg_confirm_delete_file', 'Delete file? This will remove all match data.') }}');">
+                            <input type="hidden" name="file_id" value="{{ f.id }}">
+                            <button type="submit" name="delete" class="btn btn-danger btn-sm" title="{{ _('title_delete_file', 'Delete File') }}" style="color: white; background-color: #dc3545; border-color: #dc3545;">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </form>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

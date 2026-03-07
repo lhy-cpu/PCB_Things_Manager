@@ -1,0 +1,51 @@
+{% extends 'base.html' %}
+
+{% block header %}{{ _('cat_header', 'Category Management') }}{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h3>{{ _('cat_add_primary', 'Add Primary Category') }}</h3>
+    <form method="POST" style="display:flex; gap:10px;">
+        <input type="text" name="name" placeholder="{{ _('cat_name_ph', 'Category Name') }}" required>
+        <button type="submit" name="add_primary" class="btn btn-primary">{{ _('btn_add_primary', 'Add Primary') }}</button>
+    </form>
+</div>
+
+<div class="card">
+    <h3>{{ _('cat_existing_title', 'Existing Categories') }}</h3>
+    {% for p in categories %}
+    <div style="border-bottom: 1px solid #eee; padding: 10px 0; display:flex; gap: 20px;">
+        <div style="width: 250px;">
+            <strong style="font-size: 1.1em;">{{ p.name }}</strong>
+            <form method="POST" style="display:inline;" onsubmit="return confirm('{{ _('msg_confirm_delete_primary', 'Delete primary category AND all its sub-categories?') }}');">
+                <input type="hidden" name="id" value="{{ p.id }}">
+                <button type="submit" name="delete_primary" style="background:none; border:none; color:red; cursor:pointer;" title="{{ _('btn_delete', 'Delete') }}">
+                    {{ _('icon_trash', 'Trash') }} <!-- You might want to use an icon font class here instead if you have one, currently just text or keep <i> -->
+                    <i class="fas fa-trash"></i>
+                </button>
+            </form>
+        </div>
+        
+        <div style="flex:1;">
+            <ul style="list-style: none; margin-bottom: 10px;">
+                {% for s in p.children %}
+                <li style="display:inline-block; margin-right: 15px; margin-bottom: 5px; background: #f0f0f0; padding: 2px 8px; border-radius: 4px;">
+                    {{ s.name }}
+                    <form method="POST" style="display:inline;" onsubmit="return confirm('{{ _('msg_confirm_delete_sub', 'Delete sub-category?') }}');">
+                        <input type="hidden" name="id" value="{{ s.id }}">
+                        <button type="submit" name="delete_secondary" style="background:none; border:none; color:#999; cursor:pointer; font-size: 0.8em;" title="{{ _('btn_delete', 'Delete') }}">x</button>
+                    </form>
+                </li>
+                {% endfor %}
+            </ul>
+            
+            <form method="POST" style="display:flex; gap:5px; align-items: center;">
+                <input type="hidden" name="primary_id" value="{{ p.id }}">
+                <input type="text" name="name" placeholder="{{ _('cat_new_sub_ph', 'New Sub-category...') }}" required style="width: 150px; padding: 4px;">
+                <button type="submit" name="add_secondary" class="btn btn-sm btn-secondary">+</button>
+            </form>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}
