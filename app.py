@@ -3,7 +3,7 @@ import sqlite3
 import csv
 import io
 import json
-from flask import Flask, render_template, request, redirect, url_for, flash, send_from_directory, g, session
+from flask import Flask, render_template, request, redirect, url_for, flash, send_from_directory, g, session, jsonify
 from werkzeug.utils import secure_filename
 from datetime import datetime
 
@@ -32,6 +32,96 @@ def before_request():
     g.lang = session.get('lang', 'zh') # Default to Chinese
     g.translations = load_locale(g.lang)
 
+def get_currency_config(lang_code):
+    """
+    Returns currency configuration for the given language.
+    """
+    db = get_db()
+    
+    # Defaults
+    config = {'code': 'CNY', 'symbol': '¥', 'rate': 1.0}
+    
+    # Map language to currency code
+    lang_map = {
+        'zh': 'CNY',
+        'en': 'USD',
+        'de': 'EUR'
+    }
+    
+    target_currency = lang_map.get(lang_code, 'CNY')
+    
+    if target_currency == 'CNY':
+        return config # Base currency
+        
+    rate_key = f'rate_{target_currency}'
+    
+    # Defaults fallback map
+    defaults = {
+        'rate_USD': 0.14,
+        'rate_EUR': 0.13
+    }
+    
+    # Ensure settings table exists and has defaults before querying
+    try:
+        row = db.execute('SELECT value FROM settings WHERE key = ?', (rate_key,)).fetchone()
+    except sqlite3.OperationalError:
+        # If table wrong, return config with default rate if known, else 1.0
+        # Actually simplest to just return default config but with correct rate if possible
+        config['rate'] = defaults.get(rate_key, 1.0)
+        return config
+
+    if row:
+        try:
+            rate = float(row['value'])
+        except (ValueError, TypeError):
+            rate = 1.0
+    else:
+        # Key missing in DB, use default
+        rate = defaults.get(rate_key, 1.0)
+    
+    symbols = {
+        'CNY': '¥',
+        'USD': '$',
+        'EUR': '€'
+    }
+    
+    return {
+        'code': target_currency,
+        'symbol': symbols.get(target_currency, '?'),
+        'rate': rate
+    }
+
+def convert_to_base(amount, lang_code):
+    """
+    Converts amount from the currency associated with lang_code to base currency (CNY).
+    Algorithm: Base = Amount / Rate
+    Example: 14 USD / 0.14 = 100 CNY
+    """
+    try:
+        amount = float(amount)
+    except (ValueError, TypeError):
+        return 0.0
+        
+    config = get_currency_config(lang_code)
+    try:
+         return amount / config['rate']
+    except ZeroDivisionError:
+         return amount
+
+def convert_from_base(amount, lang_code):
+    """
+    Converts amount from base currency (CNY) to the currency associated with lang_code.
+    Algorithm: Local = Base * Rate
+    Example: 100 CNY * 0.14 = 14 USD
+    """
+    try:
+        amount = float(amount)
+    except (ValueError, TypeError):
+        return 0.0
+
+    config = get_currency_config(lang_code)
+    return amount * config['rate']
+
 def get_trans(key, default=None):
     return g.translations.get(key, default or key)
 
@@ -39,7 +129,24 @@ def get_trans(key, default=None):
 def inject_i18n():
     def get_text(key, default=None):
         return g.translations.get(key, default or key)
-    return dict(_=get_text, current_lang=g.lang)
+    
+    # helper for templates to start currency conversion
+    def format_price(amount_base):
+        try:
+            val = convert_from_base(amount_base, g.lang)
+            return "{:.5f}".format(val)
+        except:
+             return "0.00000"
+
+    # We need to access DB for currency config, which might not be ready during initial setup
+    # So we wrap it in a try-except or check
+    try:
+        currency_config = get_currency_config(g.lang)
+        symbol = currency_config['symbol']
+    except:
+        symbol = '¥'
+
+    return dict(_=get_text, current_lang=g.lang, currency_symbol=symbol, format_price=format_price)
 
 @app.route('/set_language/<lang_code>')
 def set_language(lang_code):
@@ -73,7 +180,8 @@ def init_db():
                 secondary_category TEXT,
                 supplier_part TEXT,
                 current_quantity INTEGER DEFAULT 0,
-                remark TEXT
+                remark TEXT,
+                unit_price REAL DEFAULT 0.0
             )
         ''')
         # Transaction history
@@ -130,6 +238,17 @@ def init_db():
                 UNIQUE(name, primary_id)
             )
         ''')
+        
+        # Settings
+        db.execute('''
+            CREATE TABLE IF NOT EXISTS settings (
+                key TEXT PRIMARY KEY,
+                value TEXT
+            )
+        ''')
+        # Seed default rates
+        db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('rate_USD', '0.14')")
+        db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('rate_EUR', '0.13')")
         
         # Migration: Sync existing categories from components table to category tables
         # This ensures we have data even if tables were just created
@@ -234,6 +353,38 @@ def categories():
             
     return render_template('categories.html', categories=structure.values())
 
+@app.route('/settings', methods=['GET', 'POST'])
+def settings():
+    db = get_db()
+    if request.method == 'POST':
+        # Update rates
+        rate_usd = request.form.get('rate_USD')
+        rate_eur = request.form.get('rate_EUR')
+        
+        if rate_usd:
+             db.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('rate_USD', ?)", (rate_usd,))
+        if rate_eur:
+             db.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('rate_EUR', ?)", (rate_eur,))
+        
+        db.commit()
+        flash(get_trans('flash_settings_saved', 'Settings saved.'))
+        return redirect(url_for('settings'))
+
+    # Load current rates
+    rates = {}
+    rows = db.execute('SELECT key, value FROM settings').fetchall()
+    for r in rows:
+        try:
+            rates[r['key']] = float(r['value'])
+        except (ValueError, TypeError):
+            rates[r['key']] = 0.0
+    
+    # Ensure defaults in view if DB is empty/fresh
+    if 'rate_USD' not in rates: rates['rate_USD'] = 0.14
+    if 'rate_EUR' not in rates: rates['rate_EUR'] = 0.13
+
+    return render_template('settings.html', rates=rates)
+
 @app.route('/inventory', methods=['GET', 'POST'])
 def inventory():
     db = get_db()
@@ -272,11 +423,15 @@ def inventory():
             supplier = request.form['supplier_part']
             qty = int(request.form['quantity'])
             remark = request.form.get('remark', '')
+            
+            raw_price = float(request.form.get('unit_price', 0.0))
+            # Convert input price (in current currency) to Base Currency (CNY) for storage
+            price_base = convert_to_base(raw_price, g.lang)
 
             cursor = db.execute('''
-                INSERT INTO components (model, footprint, primary_category, secondary_category, supplier_part, current_quantity, remark)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            ''', (model, footprint, p_cat, s_cat, supplier, qty, remark))
+                INSERT INTO components (model, footprint, primary_category, secondary_category, supplier_part, current_quantity, remark, unit_price)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (model, footprint, p_cat, s_cat, supplier, qty, remark, price_base))
             
             # Initial stock log
             if qty != 0:
@@ -336,12 +491,31 @@ def inventory():
             supplier = request.form['supplier_part']
             remark = request.form.get('remark', '')
             
+            raw_price = float(request.form.get('unit_price', 0.0))
+            price_base = convert_to_base(raw_price, g.lang)
+
             db.execute('''
                 UPDATE components
-                SET model=?, footprint=?, primary_category=?, secondary_category=?, supplier_part=?, remark=?
+                SET model=?, footprint=?, primary_category=?, secondary_category=?, supplier_part=?, remark=?, unit_price=?
                 WHERE id=?
-            ''', (model, footprint, p_cat, s_cat, supplier, remark, comp_id))
+            ''', (model, footprint, p_cat, s_cat, supplier, remark, price_base, comp_id))
             db.commit()
+
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                updated_comp = db.execute('SELECT * FROM components WHERE id = ?', (comp_id,)).fetchone()
+                return jsonify({
+                    'status': 'success',
+                    'id': updated_comp['id'],
+                    'model': updated_comp['model'],
+                    'footprint': updated_comp['footprint'] or '',
+                    'primary_category': updated_comp['primary_category'] or '',
+                    'secondary_category': updated_comp['secondary_category'] or '',
+                    'supplier_part': updated_comp['supplier_part'] or '',
+                    'remark': updated_comp['remark'] or '',
+                    'unit_price': "{:.5f}".format(convert_from_base(updated_comp['unit_price'], g.lang)),
+                    'message': get_trans('flash_comp_updated', 'Component updated successfully!')
+                })
+
             flash(get_trans('flash_comp_updated', 'Component updated successfully!'))
 
         return redirect(url_for('inventory'))
@@ -572,7 +746,7 @@ def bom_match(file_id):
     # Load Components for dropdown with Available quantity context
     all_components = db.execute('''
         SELECT 
-            c.id, c.model, c.footprint, c.current_quantity,
+            c.id, c.model, c.footprint, c.current_quantity, c.unit_price,
             (SELECT COALESCE(SUM(quantity_needed), 0) FROM bom_matches WHERE matched_component_id = c.id AND status = 'saved') as reserved
         FROM components c
     ''').fetchall()
@@ -691,6 +865,7 @@ def stats():
             c.model, 
             c.footprint,
             c.current_quantity,
+            c.unit_price,
             COALESCE(ts.total_in, 0) as total_in,
             COALESCE(ts.total_out, 0) as total_out,
             COALESCE(rc.reserved_qty, 0) as reserved
@@ -699,7 +874,23 @@ def stats():
         LEFT JOIN ReservedCounts rc ON c.id = rc.matched_component_id
     ''').fetchall()
     
-    return render_template('stats.html', stats=stats_data)
+    # Calculate Total Value.
+    # Exclude negative quantities (oversold/excess) from value calculation.
+    total_value_base = sum(
+        (c['current_quantity'] if c['current_quantity'] > 0 else 0) * (float(c['unit_price'] or 0)) 
+        for c in stats_data
+    )
+    # Used Value = Total Out (always negative, so take abs) * Price
+    used_value_base = sum(abs(c['total_out']) * (float(c['unit_price'] or 0)) for c in stats_data)
+
+    # Reserved Value = Reserved Qty * Price (includes excess if reserved exceeds stock, though physically impossible to reserve more than existing usually, but logic allows it)
+    reserved_value_base = sum(c['reserved'] * (float(c['unit_price'] or 0)) for c in stats_data)
+    
+    total_value = convert_from_base(total_value_base, g.lang)
+    used_value = convert_from_base(used_value_base, g.lang)
+    reserved_value = convert_from_base(reserved_value_base, g.lang)
+    
+    return render_template('stats.html', stats=stats_data, total_value=total_value, used_value=used_value, reserved_value=reserved_value)
 
 if __name__ == '__main__':
     app.run(debug=True)

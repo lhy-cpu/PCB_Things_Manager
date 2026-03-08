@@ -1,0 +1,59 @@
+{% extends 'base.html' %}
+
+{% block header %}
+    {{ _('settings_header', 'Settings') }}
+{% endblock %}
+
+{% block content %}
+<div class="settings-container">
+    <h2>{{ _('settings_language_title', 'Language Settings') }}</h2>
+    <div style="margin-bottom: 30px; background: white; padding: 20px; border-radius: 5px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+        <label for="lang-select" style="font-weight: bold; margin-bottom: 10px; display: block;">{{ _('settings_select_lang', 'Select Application Language') }}</label>
+        <select id="lang-select" onchange="window.location.href=this.value" style="padding: 10px; border-radius: 4px; border: 1px solid #ccc; max-width: 300px; cursor: pointer;">
+            <option value="{{ url_for('set_language', lang_code='en') }}" {% if current_lang == 'en' %}selected{% endif %}>English</option>
+            <option value="{{ url_for('set_language', lang_code='zh') }}" {% if current_lang == 'zh' %}selected{% endif %}>中文 (Chinese)</option>
+            <option value="{{ url_for('set_language', lang_code='de') }}" {% if current_lang == 'de' %}selected{% endif %}>Deutsch (German)</option>
+        </select>
+    </div>
+
+    <h2>{{ _('settings_currency_title', 'Currency Settings') }}</h2>
+    <p>{{ _('settings_rates_desc', 'Set the exchange rates relative to the base currency (CNY). Base currency is always 1.0.') }}</p>
+    
+    <form method="POST" class="settings-form">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>{{ _('th_currency_name', 'Currency') }}</th>
+                    <th>{{ _('th_exchange_rate', 'Exchange Rate') }}</th>
+                    <th>{{ _('th_example', 'Example (100 CNY = ?)') }}</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><i class="fas fa-yen-sign"></i> CNY (Base)</td>
+                    <td>1.0 (Fixed)</td>
+                    <td>100.0000</td>
+                </tr>
+                <tr>
+                    <td><i class="fas fa-dollar-sign"></i> USD</td>
+                    <td>
+                        <input type="number" step="0.0001" name="rate_USD" value="{{ rates['rate_USD'] }}" required>
+                    </td>
+                    <td>{{ (100 * rates['rate_USD'])|round(4) }}</td>
+                </tr>
+                <tr>
+                    <td><i class="fas fa-euro-sign"></i> EUR</td>
+                    <td>
+                        <input type="number" step="0.0001" name="rate_EUR" value="{{ rates['rate_EUR'] }}" required>
+                    </td>
+                    <td>{{ (100 * rates['rate_EUR'])|round(4) }}</td>
+                </tr>
+            </tbody>
+        </table>
+        
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">{{ _('btn_save_settings', 'Save Settings') }}</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

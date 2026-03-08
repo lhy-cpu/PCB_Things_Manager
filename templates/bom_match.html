@@ -9,17 +9,22 @@
 </div>
 
 <form method="POST">
-    <div style="margin-bottom: 20px; position: sticky; top: 0; background: white; padding: 10px; z-index: 100; border-bottom: 2px solid #ddd;">
-        <button type="submit" name="save" class="btn btn-secondary">{{ _('btn_save_reserve', 'Reserve (Save)') }}</button>
-        <button type="submit" name="checkout" class="btn btn-primary" onclick="return confirm('{{ _('msg_confirm_checkout', 'This will update inventory stock. Continue?') }}')">{{ _('btn_checkout', 'Checkout / Update Inventory') }}</button>
-        <button type="submit" name="reset" class="btn btn-danger" onclick="return confirm('{{ _('msg_confirm_reset', 'Re-parse CSV? All local changes to matches will be lost.') }}')" style="margin-left: 20px;">{{ _('btn_reset', 'Re-parse / Reset') }}</button>
+    <div style="margin-bottom: 20px; position: sticky; top: 0; background: white; padding: 10px; z-index: 100; border-bottom: 2px solid #ddd; display: flex; justify-content: space-between; align-items: center;">
+        <div>
+            <button type="submit" name="save" class="btn btn-secondary">{{ _('btn_save_reserve', 'Reserve (Save)') }}</button>
+            <button type="submit" name="checkout" class="btn btn-primary" onclick="return confirm('{{ _('msg_confirm_checkout', 'This will update inventory stock. Continue?') }}')">{{ _('btn_checkout', 'Checkout / Update Inventory') }}</button>
+            <button type="submit" name="reset" class="btn btn-danger" onclick="return confirm('{{ _('msg_confirm_reset', 'Re-parse CSV? All local changes to matches will be lost.') }}')" style="margin-left: 20px;">{{ _('btn_reset', 'Re-parse / Reset') }}</button>
+        </div>
+        <div style="font-size: 1.2em; font-weight: bold;">
+            {{ _('bom_total_matched_price', 'Matched Total Price') }}: <span style="color: #27ae60;">{{ _('currency_symbol', '$') }} <span id="total-price">0.00</span></span>
+        </div>
     </div>
 
     <table style="font-size: 0.9em;">
         <thead>
             <tr>
                 <th style="width: 5%">{{ _('th_row', 'Row') }}</th>
-                <th style="width: 30%">{{ _('th_csv_data', 'CSV Data') }}</th>
+                <th style="width: 30%; max-width: 300px;">{{ _('th_csv_data', 'CSV Data') }}</th>
                 <th style="width: 35%">{{ _('th_matched_comp', 'Matched Component') }}</th>
                 <th style="width: 10%">{{ _('th_qty_needed', 'Qty Needed') }}</th>
                 <th style="width: 10%">{{ _('th_status', 'Status') }}</th>
@@ -32,7 +37,7 @@
                     <input type="hidden" name="row_index" value="{{ row.csv_data.idx }}">
                     <input type="hidden" name="match_row_id_{{ row.csv_data.idx }}" value="{{ row.db_id }}">
                 </td>
-                <td>
+                <td style="max-width: 300px; word-wrap: break-word;">
                     <b>{{ row.csv_data['Comment'] }}</b><br>
                     <small>
                         {{ _('lbl_stats', 'Stats') }}: {{ row.csv_data['Quantity'] }} pcs | {{ row.csv_data['Footprint'] }}<br>
@@ -42,21 +47,21 @@
                     </small>
                 </td>
                 <td>
-                    <select name="match_{{ row.csv_data.idx }}" style="width: 100%">
-                        <option value="None">{{ _('opt_manual_select', '-- Manual Select --') }}</option>
+                    <select name="match_{{ row.csv_data.idx }}" class="match-select" data-qty="{{ row.csv_data['Quantity'] }}" style="width: 100%" onchange="updateTotal()">
+                        <option value="None" data-price="0">{{ _('opt_manual_select', '-- Manual Select --') }}</option>
                         {% for c in components %}
-                        <option value="{{ c.id }}" {% if c.id == row.matched_component_id %}selected{% endif %}>
-                            {{ c.model }} | {{ c.footprint }} ({{ _('lbl_stock_short', 'Stock') }}: {{ c.current_quantity }}, {{ _('lbl_avail_short', 'Avail') }}: {{ c.current_quantity - c.reserved }})
+                        <option value="{{ c.id }}" data-price="{{ format_price(c.unit_price) }}" {% if c.id == row.matched_component_id %}selected{% endif %}>
+                            {{ c.model }} | {{ c.footprint }} ({{ _('lbl_stock_short', 'Stock') }}: {{ c.current_quantity }}, {{ _('lbl_avail_short', 'Avail') }}: {{ c.current_quantity - c.reserved }}) - {{ currency_symbol }}{{ format_price(c.unit_price) }}
                         </option>
                         {% endfor %}
                     </select>
                 </td>
                 <td>
                     <div style="display: flex; align-items: center; gap: 5px;">
-                        <input type="number" id="qty_input_{{ row.csv_data.idx }}" name="qty_{{ row.csv_data.idx }}" value="{{ row.quantity_needed }}" style="width: 60px">
+                        <input type="number" id="qty_input_{{ row.csv_data.idx }}" name="qty_{{ row.csv_data.idx }}" value="{{ row.quantity_needed }}" style="width: 60px" oninput="updateTotal()">
                         {% if row.status != 'committed' %}
                         <button type="button" class="btn btn-secondary btn-sm" 
-                            onclick="document.getElementById('qty_input_{{ row.csv_data.idx }}').value = '{{ row.csv_data.Quantity }}'"
+                            onclick="document.getElementById('qty_input_{{ row.csv_data.idx }}').value = '{{ row.csv_data.Quantity }}'; updateTotal();"
                             title="{{ _('title_reset_qty', 'Reset to CSV Quantity') }} ({{ row.csv_data.Quantity }})"
                             style="padding: 2px 6px; font-size: 0.8em;">
                             <i class="fas fa-undo"></i>
@@ -78,4 +83,31 @@
         </tbody>
     </table>
 </form>
+
+<script>
+    function updateTotal() {
+        let total = 0;
+        const selects = document.querySelectorAll('.match-select');
+        selects.forEach(select => {
+            // Get index from name "match_X"
+            const name = select.getAttribute('name');
+            if (name && name.startsWith('match_')) {
+                const idx = name.split('_')[1];
+                const input = document.getElementById('qty_input_' + idx);
+                const qty = parseFloat(input.value) || 0;
+                
+                const option = select.options[select.selectedIndex];
+                const price = parseFloat(option.getAttribute('data-price')) || 0;
+                
+                if (select.value !== 'None') {
+                    total += qty * price;
+                }
+            }
+        });
+        document.getElementById('total-price').innerText = total.toFixed(2);
+    }
+    
+    // Initial calculation
+    document.addEventListener('DOMContentLoaded', updateTotal);
+</script>
 {% endblock %}

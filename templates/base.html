@@ -6,26 +6,24 @@
     <title>PCB Things Manager</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='vendor/font-awesome/css/all.min.css') }}">
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
 </head>
 <body>
     <div class="layout">
-        <nav class="sidebar">
-            <div class="logo">
+        <nav class="sidebar" id="sidebar">
+            <div class="logo" onclick="toggleSidebar()" title="Toggle Sidebar">
                 <h2>{{ _('app_title', 'PCB Things Manager') }}</h2>
             </div>
             <ul>
-                <li><a href="{{ url_for('index') }}"><i class="fas fa-home"></i> {{ _('sidebar_home', 'Home') }}</a></li>
-                <li><a href="{{ url_for('inventory') }}"><i class="fas fa-microchip"></i> {{ _('sidebar_inventory', 'Inventory') }}</a></li>
-                <li><a href="{{ url_for('categories') }}"><i class="fas fa-tags"></i> {{ _('sidebar_categories', 'Categories') }}</a></li>
-                <li><a href="{{ url_for('csv_manage') }}"><i class="fas fa-file-csv"></i> {{ _('sidebar_bom', 'BOM / CSV') }}</a></li>
-                <li><a href="{{ url_for('stats') }}"><i class="fas fa-chart-line"></i> {{ _('sidebar_stats', 'Statistics') }}</a></li>
+                <li><a href="{{ url_for('index') }}"><i class="fas fa-home"></i> <span>{{ _('sidebar_home', 'Home') }}</span></a></li>
+                <li><a href="{{ url_for('inventory') }}"><i class="fas fa-microchip"></i> <span>{{ _('sidebar_inventory', 'Inventory') }}</span></a></li>
+                <li><a href="{{ url_for('categories') }}"><i class="fas fa-tags"></i> <span>{{ _('sidebar_categories', 'Categories') }}</span></a></li>
+                <li><a href="{{ url_for('csv_manage') }}"><i class="fas fa-file-csv"></i> <span>{{ _('sidebar_bom', 'BOM / CSV') }}</span></a></li>
+                <li><a href="{{ url_for('stats') }}"><i class="fas fa-chart-line"></i> <span>{{ _('sidebar_stats', 'Statistics') }}</span></a></li>
+                <li><a href="{{ url_for('settings') }}"><i class="fas fa-cog"></i> <span>{{ _('sidebar_settings', 'Settings') }}</span></a></li>
             </ul>
-            <div style="padding: 20px; text-align: center;">
-                <select onchange="window.location.href=this.value" style="padding: 5px; border-radius: 4px; border: 1px solid #ccc; width: 80%; cursor: pointer;">
-                    <option value="{{ url_for('set_language', lang_code='en') }}" {% if current_lang == 'en' %}selected{% endif %}>English</option>
-                    <option value="{{ url_for('set_language', lang_code='zh') }}" {% if current_lang == 'zh' %}selected{% endif %}>中文</option>
-                    <option value="{{ url_for('set_language', lang_code='de') }}" {% if current_lang == 'de' %}selected{% endif %}>Deutsch</option>
-                </select>
+            <div class="lang-selector">
+                <!-- Lang selector moved to Settings page -->
             </div>
         </nav>
         <main class="content">
@@ -33,18 +31,87 @@
                 <h1>{% block header %}{% endblock %}</h1>
             </header>
             
-            {% with messages = get_flashed_messages() %}
-                {% if messages %}
-                    <ul class="flashes">
-                    {% for message in messages %}
-                        <li>{{ _(message) }}</li>
-                    {% endfor %}
-                    </ul>
-                {% endif %}
-            {% endwith %}
-            
+            <div id="toast-container" class="toast-container"></div>
+
             {% block content %}{% endblock %}
         </main>
     </div>
+
+    <script>
+        // Sidebar Logic
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            sidebar.classList.toggle('collapsed');
+            
+            // Save state to localStorage
+            const isCollapsed = sidebar.classList.contains('collapsed');
+            localStorage.setItem('sidebar_collapsed', isCollapsed ? 'true' : 'false');
+        }
+
+        // Restore Sidebar State on Load
+        document.addEventListener('DOMContentLoaded', () => {
+            const sidebar = document.getElementById('sidebar');
+            const isCollapsed = localStorage.getItem('sidebar_collapsed') === 'true';
+            if (isCollapsed) {
+                sidebar.classList.add('collapsed');
+            }
+        });
+
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            
+            // Create toast element
+            const toast = document.createElement('div');
+            toast.className = 'toast'; // Base class
+            
+            // Map Flask categories to visual styles
+            // 'message' (default) -> 'success' (green) because most flashes are success messages
+            let styleType = 'info';
+            if (type === 'success' || type === 'message') styleType = 'success';
+            if (type === 'error') styleType = 'error';
+            if (type === 'info') styleType = 'info';
+            
+            toast.classList.add(styleType);
+            
+            // Icon logic
+            let iconHtml = '';
+            if (styleType === 'success') iconHtml = '<i class="fas fa-check-circle"></i> ';
+            if (styleType === 'error') iconHtml = '<i class="fas fa-exclamation-circle"></i> ';
+            if (styleType === 'info') iconHtml = '<i class="fas fa-info-circle"></i> ';
+            
+            toast.innerHTML = `
+                <span>${iconHtml}${message}</span>
+                <button class="toast-close" onclick="this.parentElement.remove()">&times;</button>
+            `;
+    
+            container.appendChild(toast);
+    
+            // Trigger animation
+            // Use setTimeout to ensure DOM insertion is registered for transition
+            setTimeout(() => {
+                 toast.classList.add('show');
+            }, 10);
+    
+            // Auto hide logic
+            setTimeout(() => {
+                toast.classList.remove('show');
+                toast.addEventListener('transitionend', () => {
+                    toast.remove();
+                });
+            }, 3000); 
+        }
+
+        // Initialize Flashed Messages from Flask
+        document.addEventListener('DOMContentLoaded', () => {
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        // Use tojson to safely encode strings for JS
+                        showToast({{ message|tojson }}, "{{ category }}");
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+        });
+    </script>
 </body>
 </html>

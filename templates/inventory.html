@@ -47,7 +47,19 @@
         </div>
         <div class="form-group">
             <label>{{ _('inv_qty_label', 'Initial Quantity') }}</label>
-            <input type="number" name="quantity" placeholder="{{ _('inv_qty_ph', 'Initial Quantity') }}" value="0" required>
+            <input type="number" id="add_qty" name="quantity" placeholder="{{ _('inv_qty_ph', 'Initial Quantity') }}" value="0" required oninput="calcTotalFromUnit()">
+        </div>
+        <div class="form-group">
+            <div style="display: flex; gap: 20px;">
+                <div style="flex: 1;">
+                     <label>{{ _('inv_price_label', 'Unit Price') }} ({{ currency_symbol }})</label>
+                     <input type="number" step="0.00001" id="add_unit_price" name="unit_price" placeholder="{{ _('inv_price_ph', '0.00000') }}" value="0.00000" oninput="calcTotalFromUnit()">
+                </div>
+                <div style="flex: 1;">
+                     <label>{{ _('inv_total_price_label', 'Total Price') }} ({{ currency_symbol }})</label>
+                     <input type="number" step="0.00001" id="add_total_price" placeholder="0.00000" oninput="calcUnitFromTotal()">
+                </div>
+            </div>
         </div>
         <div class="form-group">
             <label>{{ _('inv_remark_label', 'Remark') }}</label>
@@ -67,6 +79,7 @@
                 <th>{{ _('th_footprint', 'Footprint') }}</th>
                 <th>{{ _('th_category', 'Category') }}</th>
                 <th>{{ _('th_supplier', 'Supplier Part') }}</th>
+                <th>{{ _('th_price', 'Unit Price') }}</th>
                 <th>{{ _('th_remark', 'Remark') }}</th>
                 <th>{{ _('th_actions', 'Actions') }}</th>
                 <th>{{ _('th_stock', 'Current Stock') }}</th>
@@ -81,6 +94,7 @@
                 data-pcat="{{ c.primary_category or '' }}" 
                 data-scat="{{ c.secondary_category or '' }}" 
                 data-supplier="{{ c.supplier_part or '' }}"
+                data-price="{{ format_price(c.unit_price) }}"
                 data-remark="{{ c.remark or '' }}">
                 <td>{{ c.id }}</td>
                 <td>{{ c.model }}</td>
@@ -92,6 +106,7 @@
                     {% endif %}
                 </td>
                 <td>{{ c.supplier_part or '' }}</td>
+                <td>{{ currency_symbol }} {{ format_price(c.unit_price) }}</td>
                 <td>{{ c.remark or '' }}</td>
                 <td>
                     <button type="button" class="btn btn-secondary btn-sm" onclick="openEditModal('{{ c.id }}')">{{ _('btn_edit', 'Edit') }}</button>
@@ -161,6 +176,11 @@
         </div>
         
         <div class="form-group">
+            <label>{{ _('inv_price_label', 'Unit Price') }} ({{ currency_symbol }})</label>
+            <input type="number" step="0.00001" id="edit_price" name="unit_price">
+        </div>
+
+        <div class="form-group">
             <label>{{ _('inv_supplier_label', 'Supplier Part Number') }}</label>
             <input type="text" id="edit_supplier" name="supplier_part">
         </div>
@@ -180,6 +200,26 @@
 
 <script>
     const catData = {{ cat_tree|tojson }};
+    
+    // --- Price Calculation Logic ---
+    function calcTotalFromUnit() {
+        // Calculate Total = Units * Unit Price
+        var qty = parseFloat(document.getElementById('add_qty').value);
+        var unit = parseFloat(document.getElementById('add_unit_price').value);
+        if (!isNaN(qty) && !isNaN(unit)) {
+            document.getElementById('add_total_price').value = (qty * unit).toFixed(5);
+        }
+    }
+
+    function calcUnitFromTotal() {
+        // Calculate Unit Price = Total / Qty
+        var qty = parseFloat(document.getElementById('add_qty').value);
+        var total = parseFloat(document.getElementById('add_total_price').value);
+        if (!isNaN(qty) && qty !== 0 && !isNaN(total)) {
+            // Keep 5 decimal places for unit price
+            document.getElementById('add_unit_price').value = (total / qty).toFixed(5);
+        }
+    }
     
     // --- Add Form Logic ---
     function onPrimaryChange() {
@@ -247,6 +287,7 @@
     function openEditModal(id) {
         var row = document.getElementById('row-' + id);
         
+        document.getElementById('edit_price').value = row.getAttribute('data-price');
         document.getElementById('edit_id').value = id;
         document.getElementById('edit_model').value = row.getAttribute('data-model');
         document.getElementById('edit_footprint').value = row.getAttribute('data-footprint');
@@ -350,6 +391,76 @@
             sManual.style.display = 'none';
         }
     }
+
+    // Ajax Form Submission for Edit Modal
+    document.addEventListener('DOMContentLoaded', function() {
+        const editForm = document.querySelector('#editModal form');
+        if (editForm) {
+            editForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                const formData = new FormData(editForm);
+                
+                fetch(editForm.action, {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        // Update Table Row
+                        const row = document.getElementById('row-' + data.id);
+                        if (row) {
+                            // Update data attributes for next edit
+                            row.setAttribute('data-model', data.model);
+                            row.setAttribute('data-footprint', data.footprint);
+                            row.setAttribute('data-pcat', data.primary_category);
+                            row.setAttribute('data-scat', data.secondary_category);
+                            row.setAttribute('data-supplier', data.supplier_part);
+                            row.setAttribute('data-price', data.unit_price); // Format is matching
+                            row.setAttribute('data-remark', data.remark);
+
+                            // Update visible cells
+                            row.cells[1].textContent = data.model;
+                            row.cells[2].textContent = data.footprint;
+                            
+                            let catText = data.primary_category;
+                            if (data.secondary_category) {
+                                catText += ' / ' + data.secondary_category;
+                            } else if (!catText) {
+                                catText = '';
+                            }
+                            row.cells[3].textContent = catText;
+                            
+                            row.cells[4].textContent = data.supplier_part;
+                            row.cells[5].textContent = '{{ currency_symbol }} ' + data.unit_price;
+                            row.cells[6].textContent = data.remark;
+                        }
+                        
+                        closeEditModal();
+                        
+                        // Show success toast
+                        if (typeof showToast === 'function') {
+                            showToast(data.message, 'success');
+                        }
+                    } else {
+                        // Fallback
+                        location.reload(); 
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    if (typeof showToast === 'function') {
+                        showToast('Failed to update component.', 'error');
+                    } else {
+                        alert('Failed to update component.');
+                    }
+                });
+            });
+        }
+    });
 
 </script>
 

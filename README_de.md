@@ -3,23 +3,29 @@
 [中文](README.md) | [English](README_en.md)
 
 > ⚠️ **Haftungsausschluss**:  
-> Dieses Projekt befindet sich derzeit noch in der **Entwicklungsphase**. Funktionen können unvollständig sein und Fehler (Bugs) können noch vorhanden sein. Die Nutzung wird nur zu Lernzwecken oder in Nicht-Produktionsumgebungen empfohlen. Bitte sichern Sie Ihre Daten regelmäßig, um Datenverlust zu vermeiden.
+> Dieses Projekt befindet sich derzeit noch in der **Entwicklungsphase**. Funktionen können unvollständig sein und Fehler (Bugs) können noch vorhanden sein. Die Nutzung wird nur zu Lernzwecken oder in Nicht-Produktionsumgebungen empfohlen.
 
-**PCB Things Manager** ist ein einfaches, aber leistungsstarkes Bestandsverwaltungssystem auf Basis von Flask, das für Elektronik-Bastler und Ingenieure entwickelt wurde, um PCB-Komponenten, Module und Stücklisten (BOM) zu verwalten.
+**PCB Things Manager** ist ein einfaches, aber leistungsstarkes Bestandsverwaltungssystem auf Basis von Flask, das für Elektronik-Bastler und Ingenieure entwickelt wurde.
+
+**[Änderungsprotokoll (Changelog, nur Chinesisch)](CHANGELOG.md)**
 
 ## ✨ Funktionen
 
-*   **📦 Bestandsverwaltung**: Hinzufügen, Bearbeiten und Löschen von elektronischen Bauteilen. Verfolgen Sie Menge, Gehäusetyp und Lagerort.
-*   **🏷️ Kategorisierung**: Erstellen Sie benutzerdefinierte Kategorien, um Ihre Komponentenbibliothek zu organisieren.
+*   **📦 Bestandsverwaltung**: Hinzufügen, Bearbeiten und Löschen von Bauteilen. Verfolgen Sie Menge, Gehäusetyp und Lagerort.
+*   **💰 Kostenberechnung**: Unterstützung für Mehrwährungsumrechnung (CNY/USD/EUR), automatische Berechnung von Stückpreis und Gesamtwert.
+*   **🏷️ Kategorisierung**: Erstellen Sie Haupt- und Unterkategorien zur Organisation.
 *   **📄 BOM (Stücklisten) Verwaltung**:
-    *   Hochladen von BOM-Dateien im CSV-Format.
-    *   Automatischer Abgleich von Komponenten in der Stückliste mit Ihrem vorhandenen Bestand.
-    *   Anzeige fehlender Teile und ausreichender Lagerbestände.
-    *   Löschen hochgeladener BOM-Dateien und der zugehörigen Daten.
-*   **📊 Statistik-Dashboard**: Übersicht über den gesamten Bestandswert, die Gesamtanzahl der Komponenten und die Verteilung nach Kategorien.
-*   **🌍 Mehrsprachigkeit**: Integrierte Unterstützung für **Deutsch**, **Englisch** und **Chinesisch (Vereinfacht)**. Wechseln Sie die Oberflächensprache jederzeit.
-*   **🔒 Lokale Bereitstellung**: Alle statischen Assets (wie FontAwesome) werden lokal gehostet. Keine CDN-Abhängigkeiten, vollständig offline-fähig.
-*   **📱 Responsives Design**: Fixiertes Seitenleisten-Layout, angepasst für verschiedene Bildschirmgrößen.
+    *   **Drag & Drop** Upload für CSV-Dateien.
+    *   Automatischer Abgleich von BOM-Komponenten mit dem Bestand.
+    *   Erkennung fehlender Teile und Ein-Klick-Ausbuchung.
+*   **🖥️ Modernes UI/UX**:
+    *   **Toast-Benachrichtigungen** für direktes Feedback.
+    *   **Bearbeiten ohne Neuladen** der Seite.
+    *   Einklappbare Seitenleiste mit Speicherfunktion.
+    *   Vollständige Integration von FontAwesome-Icons.
+*   **📊 Statistik**: Übersicht über den gesamten Bestandswert, Anzahl der Komponenten und Verteilung.
+*   **🌍 Mehrsprachigkeit**: **Deutsch**, **Englisch** und **Chinesisch**. Sprache in den Einstellungen änderbar.
+*   **🔒 Lokale Bereitstellung**: Alle statischen Assets (wie Icons) werden lokal gehostet. Offline-fähig.
 
 ## 🛠️ Installation & Nutzung
 

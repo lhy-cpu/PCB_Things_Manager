@@ -4,6 +4,23 @@
 
 {% block content %}
 <div class="card">
+    <div style="display: flex; gap: 20px; justify-content: space-around;">
+        <div style="text-align: center;">
+            <p style="color: #7f8c8d; margin-bottom: 5px;">{{ _('stats_total_value', 'Total Inventory Value') }}</p>
+            <h2 style="color: #27ae60;">{{ currency_symbol }} {{ "%.2f"|format(total_value) }}</h2>
+        </div>
+        <div style="text-align: center;">
+            <p style="color: #7f8c8d; margin-bottom: 5px;">{{ _('stats_used_value', 'Used Value') }}</p>
+            <h2 style="color: #e74c3c;">{{ currency_symbol }} {{ "%.2f"|format(used_value) }}</h2>
+        </div>
+        <div style="text-align: center;">
+            <p style="color: #7f8c8d; margin-bottom: 5px;">{{ _('stats_reserved_value', 'Reserved Value') }}</p>
+            <h2 style="color: #2980b9;">{{ currency_symbol }} {{ "%.2f"|format(reserved_value) }}</h2>
+        </div>
+    </div>
+</div>
+
+<div class="card">
     <h3>{{ _('stats_overview_title', 'Data Overview') }}</h3>
     <table style="font-size: 0.9em;">
         <thead>

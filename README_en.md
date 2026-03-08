@@ -3,23 +3,29 @@
 [中文](README.md) | [Deutsch](README_de.md)
 
 > ⚠️ **Disclaimer**:  
-> This project is currently in **Deep Development**. Features may be incomplete, and bugs may exist. It is recommended for educational use or non-production environments only. Please ensure you backup your data regularly to avoid data loss.
+> This project is currently in **Deep Development**. Features may be incomplete, and bugs may exist. Recommended for educational use or non-production environments only. Please backup data regularly.
 
 **PCB Things Manager** is a simple yet powerful inventory management system built with Flask, designed for electronics hobbyists and engineers to manage PCB components, modules, and Bills of Materials (BOM).
 
+**[CHANGELOG (Chinese Only)](CHANGELOG.md)**
+
 ## ✨ Features
 
-*   **📦 Inventory Management**: Add, edit, and delete electronic components. Track quantity, package type, and location.
-*   **🏷️ Categorization**: Create custom categories to organize your component library.
+*   **📦 Inventory Management**: Add, edit, and delete components. Track quantity, package type, and location.
+*   **💰 Cost Calculation**: Supports multi-currency (CNY/USD/EUR) exchange rates, automatic unit price and total value calculation.
+*   **🏷️ Categorization**: Create custom primary and secondary categories to organize your library.
 *   **📄 BOM (Bill of Materials) Management**:
-    *   Upload BOM files in CSV format.
-    *   Automatically match components in the BOM with your existing inventory.
-    *   View missing parts and sufficient stock items.
-    *   Delete uploaded BOM files and their associated data.
-*   **📊 Statistics Dashboard**: Overview of total inventory value, total component count, and category distribution.
-*   **🌍 Multi-language Support**: Built-in support for **English**, **Chinese (Simplified)**, and **German**. Switch interface language on the fly.
-*   **🔒 Local Deployment**: All static assets (like FontAwesome) are hosted locally. No CDN dependencies, fully offline capable.
-*   **📱 Responsive Design**: Fixed sidebar layout adapted for various screen sizes.
+    *   **Drag & Drop** upload for CSV/BOM files.
+    *   Automatically match BOM components with existing inventory.
+    *   Quickly identify missing parts and one-click stock deduction.
+*   **🖥️ Modern UI/UX**:
+    *   **Toast Notifications** for instant feedback.
+    *   **Edit in Place** without page refresh.
+    *   Collapsible sidebar that remembers user preference.
+    *   Fully integrated with FontAwesome icons.
+*   **📊 Statistics Dashboard**: Overview of total inventory value, component count, and category distribution.
+*   **🌍 Multi-language**: Built-in support for **English**, **Chinese (Simplified)**, and **German**. Switch language in Settings.
+*   **🔒 Local Deployment**: All static assets hosted locally. No CDN dependencies, fully offline capable.
 
 ## 🛠️ Installation & Usage
 

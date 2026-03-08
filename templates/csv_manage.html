@@ -5,13 +5,101 @@
 {% block content %}
 <div class="card">
     <h3>{{ _('csv_upload_title', 'Upload New CSV') }}</h3>
-    <form method="POST" enctype="multipart/form-data">
-        <div class="form-group">
-            <input type="file" name="upload" accept=".csv" required>
-        </div>
-        <button type="submit" class="btn btn-primary">{{ _('btn_upload', 'Upload') }}</button>
-    </form>
+    
+    <div class="drop-area" id="drop-area">
+        <form class="my-form" method="POST" enctype="multipart/form-data">
+            <i class="fas fa-cloud-upload-alt upload-icon"></i>
+            <p>{{ _('msg_drag_drop', 'Drag and drop your CSV file here') }}</p>
+            <p style="margin-top: 5px; font-size: 0.9em; opacity: 0.7;">{{ _('msg_or_click', 'or click to browse') }}</p>
+            
+            <input type="file" id="fileElem" name="upload" accept=".csv" onchange="handleFiles(this.files)">
+            <label class="button" for="fileElem" style="display:none;"></label> <!-- Hidden label trigger -->
+            
+            <div id="gallery" class="file-preview"></div>
+            
+            <div style="margin-top: 20px;">
+                <button type="submit" class="btn btn-primary" id="uploadBtn" disabled>{{ _('btn_upload', 'Upload') }}</button>
+            </div>
+        </form>
+    </div>
 </div>
+
+<script>
+    // --- Drag and Drop Logic ---
+    let dropArea = document.getElementById('drop-area');
+    let fileInput = document.getElementById('fileElem');
+    let uploadBtn = document.getElementById('uploadBtn');
+    let preview = document.getElementById('gallery');
+
+    // Prevent default drag behaviors
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        dropArea.addEventListener(eventName, preventDefaults, false);
+        document.body.addEventListener(eventName, preventDefaults, false);
+    });
+
+    function preventDefaults(e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+
+    // Highlight drop area when item is dragged over it
+    ['dragenter', 'dragover'].forEach(eventName => {
+        dropArea.addEventListener(eventName, highlight, false);
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+        dropArea.addEventListener(eventName, unhighlight, false);
+    });
+
+    function highlight(e) {
+        dropArea.classList.add('highlight');
+    }
+
+    function unhighlight(e) {
+        dropArea.classList.remove('highlight');
+    }
+
+    // Handle dropped files
+    dropArea.addEventListener('drop', handleDrop, false);
+    
+    // Also handle click on the area to trigger file input
+    dropArea.addEventListener('click', function(e) {
+        // Avoid infinite loop if clicking the input itself or button
+        if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'BUTTON') {
+             fileInput.click();
+        }
+    });
+
+    function handleDrop(e) {
+        let dt = e.dataTransfer;
+        let files = dt.files;
+        handleFiles(files);
+    }
+
+    function handleFiles(files) {
+        if (files.length > 0) {
+            const file = files[0];
+            
+            // Validate CSV
+            if (!file.name.toLowerCase().endsWith('.csv')) {
+                 if (typeof showToast === 'function') showToast("{{ _('err_invalid_file', 'Please select a CSV file.') }}", 'error');
+                 else alert("{{ _('err_invalid_file', 'Please select a CSV file.') }}");
+                 return;
+            }
+            
+            // Update file input using DataTransfer (modern way to set input.files)
+            const list = new DataTransfer();
+            list.items.add(file);
+            fileInput.files = list.files;
+
+            // Update UI
+            dropArea.classList.add('has-file');
+            preview.innerHTML = `<i class="fas fa-file-csv"></i> ${file.name}`;
+            preview.classList.add('show');
+            uploadBtn.disabled = false;
+        }
+    }
+</script>
 
 <div class="card">
     <h3>{{ _('csv_managed_title', 'Managed Files') }}</h3>
