@@ -15,14 +15,17 @@
 *   **💰 Kostenberechnung**: Unterstützung für Mehrwährungsumrechnung (CNY/USD/EUR), automatische Berechnung von Stückpreis und Gesamtwert.
 *   **🏷️ Kategorisierung**: Erstellen Sie Haupt- und Unterkategorien zur Organisation.
 *   **📄 BOM (Stücklisten) Verwaltung**:
+    *   **Intelligentes Matching**: Anpassbare spezielle Matching-Regeln zur besseren Identifizierung von Komponenten.
+    *   **Regelverwaltung**: Neue Seite zur Verwaltung spezieller Regeln, CRUD für JSON-Regeln, Import/Export.
     *   **Drag & Drop** Upload für CSV-Dateien.
     *   Automatischer Abgleich von BOM-Komponenten mit dem Bestand.
     *   Erkennung fehlender Teile und Ein-Klick-Ausbuchung.
 *   **🖥️ Modernes UI/UX**:
     *   **Toast-Benachrichtigungen** für direktes Feedback.
     *   **Bearbeiten ohne Neuladen** der Seite.
-    *   Einklappbare Seitenleiste mit Speicherfunktion.
+    *   **Fixierte Seitenleiste**: Bleibt beim Scrollen sichtbar, einklappbar und merkt sich Benutzereinstellung.
     *   Vollständige Integration von FontAwesome-Icons.
+    *   **UTC-Zeitunterstützung**: Backend speichert vereinheitlicht in UTC, Frontend konvertiert automatisch in lokale Zeit.
 *   **📊 Statistik**: Übersicht über den gesamten Bestandswert, Anzahl der Komponenten und Verteilung.
 *   **🌍 Mehrsprachigkeit**: **Deutsch**, **Englisch** und **Chinesisch**. Sprache in den Einstellungen änderbar.
 *   **🔒 Lokale Bereitstellung**: Alle statischen Assets (wie Icons) werden lokal gehostet. Offline-fähig.
@@ -77,6 +80,7 @@
     *   `locales/`: Speichert `en.json`, `zh.json`, `de.json` Übersetzungsdateien.
 *   `dataset/`: Datenspeicherverzeichnis.
     *   `inventory.sqlite`: SQLite-Datenbankdatei (wird beim ersten Start automatisch erstellt).
+    *   `special_rules.json`: Speichert spezielle BOM-Matching-Regeln.
     *   `csv_files/`: Vom Benutzer hochgeladene BOM-CSV-Dateien.
 
 ## 📝 Lizenz

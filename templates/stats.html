@@ -37,7 +37,9 @@
         <tbody>
             {% for s in stats %}
             <tr>
-                <td>{{ s.model }}</td>
+                <td style="cursor: pointer; color: #3498db; text-decoration: underline;" onclick="showHistory({{ s.id }}, '{{ s.model }}')">
+                    {{ s.model }}
+                </td>
                 <td>{{ s.footprint }}</td>
                 <td style="color: green">{{ s.total_in }}</td>
                 <td style="color: red">{{ s.total_out }}</td>
@@ -51,4 +53,110 @@
         </tbody>
     </table>
 </div>
+
+<!-- History Modal -->
+<div id="historyModal" class="modal">
+  <div class="modal-content" style="width: 80%; max-width: 800px;">
+    <span class="close" onclick="closeModal()">&times;</span>
+    <h3 id="modalTitle" style="margin-bottom: 20px;">{{ _('history_modal_title', 'Component History') }}</h3>
+    <div style="overflow-x: auto;">
+        <table>
+            <thead>
+                <tr>
+                    <th>{{ _('th_date_col', 'Date') }}</th>
+                    <th>{{ _('th_change', 'Change') }}</th>
+                    <th>{{ _('th_note_source', 'Note / Source') }}</th>
+                </tr>
+            </thead>
+            <tbody id="historyTableBody">
+                <!-- Loaded via JS -->
+            </tbody>
+        </table>
+    </div>
+  </div>
+</div>
+
+<script>
+// I18n for JS
+const i18n_hist = {
+    title: "{{ _('history_modal_title', 'Component History') }}",
+    loading: "{{ _('msg_loading', 'Loading...') }}",
+    no_history: "{{ _('msg_no_history', 'No history found.') }}",
+    error: "{{ _('msg_error_loading', 'Error loading history.') }}",
+    source: "{{ _('source_label', 'Source:') }}",
+    deleted: "{{ _('link_deleted_bom', 'Deleted BOM') }}"
+};
+
+function showHistory(compId, modelName) {
+    const modal = document.getElementById('historyModal');
+    const title = document.getElementById('modalTitle');
+    const tbody = document.getElementById('historyTableBody');
+    
+    title.innerText = i18n_hist.title + ': ' + modelName;
+    tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;">' + i18n_hist.loading + '</td></tr>';
+    modal.style.display = 'block';
+    
+    fetch('/api/component/' + compId + '/history')
+        .then(response => response.json())
+        .then(data => {
+            tbody.innerHTML = '';
+            if (data.length === 0) {
+                 tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;">' + i18n_hist.no_history + '</td></tr>';
+            } else {
+                data.forEach(item => {
+                    const tr = document.createElement('tr');
+                    
+                    // Date
+                    const tdDate = document.createElement('td');
+                    tdDate.innerText = (typeof window.convertUTCDate === 'function')
+                        ? window.convertUTCDate(item.date)
+                        : item.date;
+                    tr.appendChild(tdDate);
+                    
+                    // Amount
+                    const tdAmount = document.createElement('td');
+                    const amtCtx = item.amount > 0 ? '+' : '';
+                    tdAmount.innerText = amtCtx + item.amount;
+                    tdAmount.style.color = item.amount > 0 ? 'green' : (item.amount < 0 ? 'red' : 'black');
+                    tdAmount.style.fontWeight = 'bold';
+                    tr.appendChild(tdAmount);
+                    
+                    // Note / Origin
+                    const tdNote = document.createElement('td');
+                    if (item.bom_id) {
+                        const noteText = item.note || '';
+                        if (item.bom_name) {
+                            const link = `/bom_match/${item.bom_id}`;
+                            tdNote.innerHTML = `${noteText} <br> <small>${i18n_hist.source} <a href="${link}" target="_blank">${item.bom_name}</a></small>`;
+                        } else {
+                            // File deleted
+                             tdNote.innerHTML = `${noteText} <br> <small style="color:gray;">${i18n_hist.source} ${i18n_hist.deleted} (ID ${item.bom_id})</small>`;
+                        }
+                    } else {
+                        tdNote.innerText = item.note || '-';
+                    }
+                    tr.appendChild(tdNote);
+                    
+                    tbody.appendChild(tr);
+                });
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; color:red;">' + i18n_hist.error + '</td></tr>';
+        });
+}
+
+function closeModal() {
+    document.getElementById('historyModal').style.display = 'none';
+}
+
+// Close on click outside
+window.onclick = function(event) {
+    const modal = document.getElementById('historyModal');
+    if (event.target == modal) {
+        closeModal();
+    }
+}
+</script>
 {% endblock %}

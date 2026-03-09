@@ -1,0 +1,257 @@
+{% extends 'base.html' %}
+
+{% block header %}{{ _('rules_header', 'Special Matching Rules') }}{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <div>
+            <button onclick="openRuleModal()" class="btn btn-primary"><i class="fas fa-plus"></i> {{ _('btn_add_rule', 'Add Rule') }}</button>
+            <button onclick="openImportModal()" class="btn btn-secondary"><i class="fas fa-file-import"></i> {{ _('btn_import', 'Import') }}</button>
+            <a href="{{ url_for('export_rules') }}" class="btn btn-info" style="color: white;padding-top: 3.5pt;"><i class="fas fa-file-export"></i> {{ _('btn_export', 'Export') }}</a>
+        </div>
+    </div>
+    
+    <div class="rules-list">
+        {% for rule in rules %}
+        <div class="rule-item card" style="margin-bottom: 10px; padding: 10px;">
+            <div class="rule-header" style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 10px; flex: 1; cursor: pointer;" onclick="toggleRule({{ loop.index0 }})">
+                    <i id="icon-{{ loop.index0 }}" class="fas fa-chevron-down" style="transition: transform 0.3s; transform: rotate(-90deg);"></i>
+                    <span style="font-weight: bold; font-size: 1.1em;">{{ rule.description or _('lbl_no_desc', 'No Description') }}</span>
+                    {% if rule.use_smart_detect %}
+                    <span class="badge" style="background: #e67e22; color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.8em; margin-left: 10px;">{{ _('lbl_smart_detect', 'Smart Detect') }}</span>
+                    {% endif %}
+                </div>
+                <div>
+                    <button onclick="exportSingleRule({{ loop.index0 }})" class="btn btn-sm btn-info" title="{{ _('btn_export_single', 'Export Rule') }}" style="color: white; margin-right: 5px;"><i class="fas fa-file-export"></i></button>
+                    <button onclick="editRule({{ loop.index0 }})" class="btn btn-sm btn-primary"><i class="fas fa-edit"></i></button>
+                    <button onclick="deleteRule({{ loop.index0 }})" class="btn btn-sm btn-danger"><i class="fas fa-trash"></i></button>
+                </div>
+            </div>
+            <div id="details-{{ loop.index0 }}" class="rule-details" style="display: none; margin-top: 15px; border-top: 1px solid #eee; padding-top: 10px;">
+                <div style="display: flex; gap: 20px;">
+                    <div style="flex: 1;">
+                        <h4 style="margin-bottom: 5px; color: #555;">{{ _('lbl_criteria', 'Criteria') }}</h4>
+                        <pre style="background: #f8f9fa; padding: 10px; border-radius: 4px; white-space: pre-wrap;">{{ rule.criteria | pretty_json }}</pre>
+                    </div>
+                    <div style="flex: 1;">
+                        <h4 style="margin-bottom: 5px; color: #555;">{{ _('lbl_target', 'Target') }}</h4>
+                        <pre style="background: #f8f9fa; padding: 10px; border-radius: 4px; white-space: pre-wrap;">{{ rule.target | pretty_json }}</pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Add/Edit Modal -->
+<div id="ruleModal" class="modal">
+    <div class="modal-content" style="width: 90%; max-width: 800px;">
+        <span class="close" onclick="closeRuleModal()">&times;</span>
+        <h3 id="ruleModalTitle">{{ _('modal_add_rule', 'Add Rule') }}</h3>
+        
+        <form id="ruleForm" method="POST">
+            <input type="hidden" name="action" id="formAction" value="add">
+            <input type="hidden" name="index" id="ruleIndex" value="-1">
+            <input type="hidden" name="rule_data" id="ruleDataJson">
+            
+            <div class="form-group">
+                <label>{{ _('lbl_description', 'Description') }}</label>
+                <input type="text" id="editDesc" placeholder="e.g. Resistor Matching" style="width: 100%; padding: 8px;">
+            </div>
+            
+            <div class="form-group" style="display: flex; items-align: center; gap: 10px;">
+                <input type="checkbox" id="editSmart" style="width: auto;">
+                <label for="editSmart" style="display: inline;">{{ _('lbl_use_smart', 'Use Smart Detect (Ignore case, symbols)') }}</label>
+            </div>
+
+            <div style="display: flex; gap: 20px;">
+                <div style="flex: 1;">
+                    <h4>{{ _('lbl_criteria', 'Criteria') }} (JSON)</h4>
+                    <p style="font-size: 0.8em; color: gray;">Key: Value or List of Values. e.g. {"Comment": "10k"}</p>
+                    <textarea id="editCriteria" style="width: 100%; height: 200px; font-family: monospace;" oninput="validateJson(this)"></textarea>
+                </div>
+                <div style="flex: 1;">
+                    <h4>{{ _('lbl_target', 'Target') }} (JSON)</h4>
+                    <p style="font-size: 0.8em; color: gray;">Sets internal props. e.g. {"model": "Res 10k"}</p>
+                    <textarea id="editTarget" style="width: 100%; height: 200px; font-family: monospace;" oninput="validateJson(this)"></textarea>
+                </div>
+            </div>
+            
+            <div style="margin-top: 20px; text-align: right;">
+                <button type="button" class="btn btn-secondary" onclick="closeRuleModal()">{{ _('btn_cancel', 'Cancel') }}</button>
+                <button type="button" class="btn btn-primary" onclick="submitRule()">{{ _('btn_save', 'Save') }}</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Import Modal -->
+<div id="importModal" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeImportModal()">&times;</span>
+        <h3>{{ _('modal_import_rules', 'Import Rules') }}</h3>
+        <form method="POST" enctype="multipart/form-data">
+            <input type="hidden" name="action" value="import">
+            
+            <label style="display: block; margin-bottom: 15px;">
+                <input type="file" name="file" accept=".json" required>
+            </label>
+            
+            <div style="margin-bottom: 20px;">
+                <label style="display: block; margin-bottom: 5px;">
+                    <input type="radio" name="mode" value="merge" checked> 
+                    {{ _('opt_merge', 'Merge (Add new rules only)') }}
+                </label>
+                <label style="display: block;">
+                    <input type="radio" name="mode" value="overwrite"> 
+                    {{ _('opt_overwrite', 'Overwrite (Replace all existing rules)') }}
+                </label>
+            </div>
+            
+            <button type="submit" class="btn btn-primary">{{ _('btn_import_confirm', 'Import') }}</button>
+        </form>
+    </div>
+</div>
+
+<!-- Delete Form (Hidden) -->
+<form id="deleteForm" method="POST" style="display:none;">
+    <input type="hidden" name="action" value="delete">
+    <input type="hidden" name="index" id="deleteIndex">
+</form>
+
+<script>
+    // Store rules in JS variable for easy editing
+    const allRules = {{ rules | tojson }};
+
+    function exportSingleRule(index) {
+        const rule = allRules[index];
+        const dataStr = JSON.stringify([rule], null, 4); // Export as list, just like full export
+        const blob = new Blob([dataStr], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        
+        let filename = "rule";
+        if (rule.description) {
+            filename = rule.description.replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, "_");
+            if (filename.length > 30) filename = filename.substring(0, 30);
+        } else {
+            filename = "rule_" + index;
+        }
+        filename += ".json";
+
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        
+        // Clean up
+        setTimeout(() => {
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+        }, 0);
+    }
+
+    function toggleRule(index) {
+        const details = document.getElementById('details-' + index);
+        const icon = document.getElementById('icon-' + index);
+        if (details.style.display === 'none') {
+            details.style.display = 'block';
+            icon.style.transform = 'rotate(0deg)';
+        } else {
+            details.style.display = 'none';
+            icon.style.transform = 'rotate(-90deg)';
+        }
+    }
+
+    function openRuleModal() {
+        document.getElementById('ruleModal').style.display = 'block';
+        document.getElementById('formAction').value = 'add';
+        document.getElementById('ruleModalTitle').innerText = "{{ _('modal_add_rule', 'Add Rule') }}";
+        
+        // Reset fields
+        document.getElementById('editDesc').value = '';
+        document.getElementById('editSmart').checked = false;
+        document.getElementById('editCriteria').value = '{\n  "Comment": "Value"\n}';
+        document.getElementById('editTarget').value = '{\n  "model": "Target Model",\n  "footprint": "Target Footprint"\n}';
+        
+        validateJson(document.getElementById('editCriteria'));
+        validateJson(document.getElementById('editTarget'));
+    }
+
+    function editRule(index) {
+        const rule = allRules[index];
+        document.getElementById('ruleModal').style.display = 'block';
+        document.getElementById('formAction').value = 'edit';
+        document.getElementById('ruleIndex').value = index;
+        document.getElementById('ruleModalTitle').innerText = "{{ _('modal_edit_rule', 'Edit Rule') }}";
+        
+        document.getElementById('editDesc').value = rule.description || '';
+        document.getElementById('editSmart').checked = !!rule.use_smart_detect;
+        document.getElementById('editCriteria').value = JSON.stringify(rule.criteria || {}, null, 2);
+        document.getElementById('editTarget').value = JSON.stringify(rule.target || {}, null, 2);
+        
+        validateJson(document.getElementById('editCriteria'));
+        validateJson(document.getElementById('editTarget'));
+    }
+
+    function deleteRule(index) {
+        if(confirm("{{ _('msg_confirm_delete_rule', 'Are you sure you want to delete this rule?') }}")) {
+            document.getElementById('deleteIndex').value = index;
+            document.getElementById('deleteForm').submit();
+        }
+    }
+
+    function closeRuleModal() {
+        document.getElementById('ruleModal').style.display = 'none';
+    }
+
+    function openImportModal() {
+        document.getElementById('importModal').style.display = 'block';
+    }
+    
+    function closeImportModal() {
+        document.getElementById('importModal').style.display = 'none';
+    }
+
+    function validateJson(textarea) {
+        try {
+            JSON.parse(textarea.value);
+            textarea.style.borderColor = '#ddd';
+            return true;
+        } catch (e) {
+            textarea.style.borderColor = 'red';
+            return false;
+        }
+    }
+
+    function submitRule() {
+        const desc = document.getElementById('editDesc').value;
+        const smart = document.getElementById('editSmart').checked;
+        const criteriaElem = document.getElementById('editCriteria');
+        const targetElem = document.getElementById('editTarget');
+        
+        if (!validateJson(criteriaElem) || !validateJson(targetElem)) {
+            alert("{{ _('msg_invalid_json', 'Please fix JSON errors.') }}");
+            return;
+        }
+        
+        const ruleObj = {
+            description: desc,
+            use_smart_detect: smart,
+            criteria: JSON.parse(criteriaElem.value),
+            target: JSON.parse(targetElem.value)
+        };
+        
+        document.getElementById('ruleDataJson').value = JSON.stringify(ruleObj);
+        document.getElementById('ruleForm').submit();
+    }
+    
+    window.onclick = function(event) {
+        if (event.target == document.getElementById('ruleModal')) closeRuleModal();
+        if (event.target == document.getElementById('importModal')) closeImportModal();
+    }
+</script>
+{% endblock %}

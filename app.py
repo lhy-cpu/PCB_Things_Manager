@@ -3,9 +3,10 @@ import sqlite3
 import csv
 import io
 import json
+import re
 from flask import Flask, render_template, request, redirect, url_for, flash, send_from_directory, g, session, jsonify
 from werkzeug.utils import secure_filename
-from datetime import datetime
+from datetime import datetime, timezone
 
 app = Flask(__name__)
 app.secret_key = 'supersecretkey'
@@ -26,6 +27,10 @@ def load_locale(lang_code):
             return json.load(f)
     except FileNotFoundError:
         return {}
+
+@app.template_filter('pretty_json')
+def pretty_json(value):
+    return json.dumps(value, ensure_ascii=False, indent=2)
 
 @app.before_request
 def before_request():
@@ -202,9 +207,14 @@ def init_db():
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 filename TEXT NOT NULL,
                 display_name TEXT NOT NULL,
-                upload_date DATETIME DEFAULT CURRENT_TIMESTAMP
+                upload_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+                last_matched REAL DEFAULT 0
             )
         ''')
+        try:
+             db.execute('ALTER TABLE bom_files ADD COLUMN last_matched REAL DEFAULT 0')
+        except:
+             pass
         # BOM Rows/Matches (stores the state of a BOM file's rows and their matching status)
         db.execute('''
             CREATE TABLE IF NOT EXISTS bom_matches (
@@ -290,6 +300,171 @@ def _get_category_tree(db):
         seconds = db.execute('SELECT name FROM category_secondary WHERE primary_id = ? ORDER BY name', (p['id'],)).fetchall()
         tree[p['name']] = [s['name'] for s in seconds]
     return tree
+
+# --- Matching Logic Helpers ---
+def load_special_rules():
+    try:
+        path = os.path.join('dataset', 'special_rules.json')
+        if os.path.exists(path):
+            mtime = os.path.getmtime(path)
+            with open(path, 'r', encoding='utf-8') as f:
+                return json.load(f), mtime
+    except:
+        pass
+    return [], 0
+
+def save_special_rules(rules):
+    try:
+        path = os.path.join('dataset', 'special_rules.json')
+        with open(path, 'w', encoding='utf-8') as f:
+            json.dump(rules, f, indent=4, ensure_ascii=False)
+        return True
+    except Exception as e:
+        print(f"Error saving rules: {e}")
+        return False
+
+def normalize_name(name):
+    if not name: return ""
+    # "SMF 3.3A" -> "SMF3.3A", remove spaces/dashes/underscores, uppercase
+    return str(name).replace(" ", "").replace("-", "").replace("_", "").upper()
+
+def normalize_footprint(fp):
+    if not fp: return ""
+    fp = str(fp).upper().strip()
+    
+    # Priority: Extract standard imperial code if present anywhere in string
+    # E.g. "LED0603-RD" -> "0603", "R0603" -> "0603", "C0402" -> "0402"
+    valid_imperial = ['01005', '0201', '0402', '0603', '0805', '1206', '1210', '2010', '2512']
+    # Regex search for these codes surrounded by non-digits
+    pattern = r'(?<!\d)(' + '|'.join(valid_imperial) + r')(?!\d)'
+    
+    match = re.search(pattern, fp)
+    if match:
+        return match.group(1)
+            
+    # Fallback: Remove verbose suffixes starting with _
+    # SOD-123_L2.8... -> SOD-123
+    if '_' in fp:
+        fp = fp.split('_')[0]
+    
+    # Handle "SOD-123" vs "SOD123"
+    fp = fp.replace("-", "")
+    
+    return fp
+
+def find_best_match(row_data, all_components, special_rules):
+    # 1. Special Rules Check
+    target_match_criteria = {}
+    
+    # Alias mapping for rules (Rule Key -> CSV Header Key)
+    # This helps when rules use 'model' but CSV has 'Comment'
+    key_aliases = {
+        'model': 'Comment',
+        'footprint': 'Footprint',
+        'supplier_part': 'Supplier Part'
+    }
+    
+    for rule in special_rules:
+        criteria = rule.get('criteria', {})
+        target = rule.get('target', {})
+        if not criteria: continue
+        
+        use_smart = rule.get('use_smart_detect', False)
+        
+        match_count = 0
+        total_criteria = len(criteria)
+        
+        for key, val in criteria.items():
+            # Resolve key from alias if needed
+            row_key = key
+            if row_key not in row_data and row_key in key_aliases:
+                row_key = key_aliases[row_key]
+                
+            row_val_raw = str(row_data.get(row_key, ''))
+            
+            # Comparison Helper
+            def check_val(r_val, c_val):
+                if not use_smart:
+                    return r_val.strip() == str(c_val).strip()
+                else:
+                    # Smart Detect
+                    # Use footprint normalizer if key implies footprint
+                    if 'footprint' in key.lower():
+                        return normalize_footprint(r_val) == normalize_footprint(c_val)
+                    else:
+                        return normalize_name(r_val) == normalize_name(c_val)
+
+            is_match = False
+            if isinstance(val, list):
+                # OR logic: if row_val matches ANY item in list
+                for v in val:
+                    if check_val(row_val_raw, v):
+                        is_match = True
+                        break
+            else:
+                # Simple string equality check
+                if check_val(row_val_raw, val):
+                    is_match = True
+            
+            if is_match:
+                match_count += 1
+        
+        if match_count == total_criteria:
+            # Rule applies!
+            if 'model' in target: target_match_criteria['model'] = target['model']
+            if 'footprint' in target: target_match_criteria['footprint'] = target['footprint']
+            if 'supplier_part' in target: target_match_criteria['supplier_part'] = target['supplier_part']
+            break
+            
+    # Prepare search terms
+    search_model_raw = target_match_criteria.get('model', row_data.get('Comment', ''))
+    search_footprint_raw = target_match_criteria.get('footprint', row_data.get('Footprint', ''))
+    search_supplier_raw = target_match_criteria.get('supplier_part', row_data.get('Supplier Part', ''))
+
+    # 2. Supplier Part Match (Strongest - Exact Match)
+    if search_supplier_raw:
+        for c in all_components:
+            if c['supplier_part'] and c['supplier_part'].strip() == search_supplier_raw.strip():
+                return c['id']
+                
+    # 3. Smart Model + Footprint Match
+    bom_model_norm = normalize_name(search_model_raw)
+    bom_fp_norm = normalize_footprint(search_footprint_raw)
+    
+    if not bom_model_norm:
+        return None
+
+    best_candidate = None
+    
+    for c in all_components:
+        c_model_norm = c['_n_model']
+        c_fp_norm = c['_n_fp']
+        
+        # Name Match Logic
+        name_match = (bom_model_norm == c_model_norm)
+        
+        # Fuzzy Name: one contains other or starts with
+        if not name_match:
+             if len(bom_model_norm) > 1 and len(c_model_norm) > 1:
+                 # Check if one is prefix of other
+                 if bom_model_norm.startswith(c_model_norm) or c_model_norm.startswith(bom_model_norm):
+                     name_match = True
+        
+        if name_match:
+            # Check Footprint
+            # If footprints match exactly (normalized)
+            if bom_fp_norm and c_fp_norm:
+                if bom_fp_norm == c_fp_norm:
+                    return c['id'] # Good Match
+            elif not bom_fp_norm and not c_fp_norm:
+                # Neither has footprint, name matches
+                best_candidate = c['id']
+            elif not bom_fp_norm and c_fp_norm:
+                 # BOM has no footprint, component does. Potential match.
+                 if best_candidate is None: best_candidate = c['id']
+            # If BOM has footprint but Comp doesn't? Or mismatch? Skip.
+            
+    return best_candidate
 
 @app.route('/')
 def index():
@@ -384,6 +559,78 @@ def settings():
     if 'rate_EUR' not in rates: rates['rate_EUR'] = 0.13
 
     return render_template('settings.html', rates=rates)
+
+@app.route('/rules', methods=['GET', 'POST'])
+def rules():
+    rules_data, _ = load_special_rules()
+
+    if request.method == 'POST':
+        action = request.form.get('action')
+        
+        if action == 'add':
+            new_rule = json.loads(request.form.get('rule_data'))
+            rules_data.append(new_rule)
+            save_special_rules(rules_data)
+            flash(get_trans('flash_rule_added', 'Rule added.'))
+            
+        elif action == 'edit':
+            index = int(request.form.get('index'))
+            new_rule = json.loads(request.form.get('rule_data'))
+            if 0 <= index < len(rules_data):
+                rules_data[index] = new_rule
+                save_special_rules(rules_data)
+                flash(get_trans('flash_rule_updated', 'Rule updated.'))
+                
+        elif action == 'delete':
+            index = int(request.form.get('index'))
+            if 0 <= index < len(rules_data):
+                del rules_data[index]
+                save_special_rules(rules_data)
+                flash(get_trans('flash_rule_deleted', 'Rule deleted.'))
+        
+        elif action == 'import':
+            file = request.files.get('file')
+            mode = request.form.get('mode', 'merge') # 'merge' or 'overwrite'
+            
+            if file and file.filename.endswith('.json'):
+                try:
+                    imported_rules = json.load(file)
+                    if not isinstance(imported_rules, list):
+                        flash(get_trans('flash_invalid_json', 'Invalid JSON format: Root must be a list.'), 'error')
+                    else:
+                        if mode == 'overwrite':
+                            rules_data = imported_rules
+                            msg = get_trans('flash_rules_overwritten', 'Rules overwritten.')
+                        else:
+                            # Merge: Add only if not exactly present
+                            added_count = 0
+                            # Simple deep equality check
+                            current_set = [json.dumps(r, sort_keys=True) for r in rules_data]
+                            for r in imported_rules:
+                                r_str = json.dumps(r, sort_keys=True)
+                                if r_str not in current_set:
+                                    rules_data.append(r)
+                                    added_count += 1
+                            msg = get_trans('flash_rules_merged', f'merged {added_count} rules.').format(added_count)
+                        
+                        save_special_rules(rules_data)
+                        flash(msg)
+                except Exception as e:
+                    flash(f"Error: {e}", 'error')
+            else:
+                 flash(get_trans('flash_invalid_file', 'Invalid file.'), 'error')
+
+        return redirect(url_for('rules'))
+
+    return render_template('rules.html', rules=rules_data)
+
+@app.route('/api/rules/export')
+def export_rules():
+    path = os.path.join('dataset', 'special_rules.json')
+    if os.path.exists(path):
+        return send_from_directory('dataset', 'special_rules.json', as_attachment=True, download_name='special_rules.json')
+    return jsonify([])
+
 
 @app.route('/inventory', methods=['GET', 'POST'])
 def inventory():
@@ -560,7 +807,7 @@ def csv_manage():
                 # Handle duplicate filenames by appending timestamp
                 if os.path.exists(os.path.join(app.config['UPLOAD_FOLDER'], filename)):
                     name, ext = os.path.splitext(filename)
-                    filename = f"{name}_{datetime.now().strftime('%Y%m%d%H%M%S')}{ext}"
+                    filename = f"{name}_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}{ext}"
                 
                 filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
                 file.save(filepath)
@@ -603,12 +850,79 @@ def csv_manage():
     files = db.execute('SELECT * FROM bom_files').fetchall()
     return render_template('csv_manage.html', files=files)
 
+def run_smart_match(db, file_id, special_rules, rules_mtime):
+    # Load Components for matching
+    all_comps_raw = db.execute('SELECT id, model, footprint, supplier_part FROM components').fetchall()
+    all_comps_smart = []
+    
+    for c in all_comps_raw:
+        all_comps_smart.append({
+            'id': c['id'], 
+            'model': c['model'], 
+            'footprint': c['footprint'], 
+            'supplier_part': c['supplier_part'],
+            '_n_model': normalize_name(c['model']),
+            '_n_fp': normalize_footprint(c['footprint'])
+        })
+        
+    # Get all matches that are NOT committed
+    matches = db.execute('SELECT * FROM bom_matches WHERE bom_file_id = ? AND status != ?', (file_id, 'committed')).fetchall()
+    
+    updated_count = 0
+    import json
+    for m in matches:
+        row_data = json.loads(m['csv_data'])
+        matched_id = find_best_match(row_data, all_comps_smart, special_rules)
+        
+        # If we found a match and it is different, update it
+        # Note: If user manually set it, this might overwrite. 
+        # But 'automatic' implies keeping it in sync.
+        # Ideally we only update if it was NOT manually set?
+        # But we don't track matches vs manual well. Status 'pending' or 'saved'.
+        # Let's assume 'saved' means user looked at it. 'pending' means raw from csv.
+        # But user wants rules applied. So we apply.
+        
+        if matched_id != m['matched_component_id']:
+             db.execute('UPDATE bom_matches SET matched_component_id = ? WHERE id = ?', (matched_id, m['id']))
+             if matched_id: updated_count += 1
+            
+    # Update BOM File last matched time
+    db.execute('UPDATE bom_files SET last_matched = ? WHERE id = ?', (rules_mtime, file_id))
+    db.commit()
+    return updated_count
+
 @app.route('/bom_match/<int:file_id>', methods=['GET', 'POST'])
 def bom_match(file_id):
     db = get_db()
     bom_file = db.execute('SELECT * FROM bom_files WHERE id = ?', (file_id,)).fetchone()
     
+    # Check for rules update on GET
+    special_rules, rules_mtime = load_special_rules()
+    
+    if request.method == 'GET':
+        # Safely get last_matched
+        last_matched = 0
+        if bom_file and 'last_matched' in bom_file.keys():
+            last_matched = bom_file['last_matched'] or 0
+
+        # If rules file is newer than last match, run update
+        if rules_mtime > last_matched:
+            count = run_smart_match(db, file_id, special_rules, rules_mtime)
+            if count > 0:
+                flash(get_trans('flash_rules_updated', f'Rules updated: {count} matches refreshed.'), 'info')
+            else:
+                 # Just update timestamp so we don't check again
+                 db.execute('UPDATE bom_files SET last_matched = ? WHERE id = ?', (rules_mtime, file_id))
+                 db.commit()
+        # Reload bom_file if updated
+        bom_file = db.execute('SELECT * FROM bom_files WHERE id = ?', (file_id,)).fetchone()
+    
     if request.method == 'POST':
+        if 'rematch' in request.form:
+             count = run_smart_match(db, file_id, special_rules, rules_mtime)
+             flash(get_trans('flash_rematch_done', f'Rematched items.'))
+             return redirect(url_for('bom_match', file_id=file_id))
+        
         # Handle Save or Checkout
         row_indices = request.form.getlist('row_index')
         
@@ -673,6 +987,20 @@ def bom_match(file_id):
                     if header_line.count(';') > header_line.count(','):
                         delimiter = ';'
             
+            # Load Smart Match Data
+            special_rules, _ = load_special_rules()
+            all_comps_raw = db.execute('SELECT id, model, footprint, supplier_part FROM components').fetchall()
+            all_comps_smart = []
+            for c in all_comps_raw:
+                all_comps_smart.append({
+                    'id': c['id'], 
+                    'model': c['model'], 
+                    'footprint': c['footprint'], 
+                    'supplier_part': c['supplier_part'],
+                    '_n_model': normalize_name(c['model']),
+                    '_n_fp': normalize_footprint(c['footprint'])
+                })
+            
             with open(filepath, 'r', encoding=encoding) as f:
                 reader = csv.DictReader(f, delimiter=delimiter)
                 
@@ -692,35 +1020,8 @@ def bom_match(file_id):
                         'Secondary Category': row.get('Secondary Category', '').strip(),
                     }
                     
-                    # Manual basic matching logic
-                    matched_id = None
-                    
-                    # 1. Supplier Part (Strongest)
-                    if row_data['Supplier Part']:
-                         found = db.execute('SELECT id FROM components WHERE supplier_part = ?', (row_data['Supplier Part'],)).fetchone()
-                         if found: matched_id = found['id']
-                    
-                    # 2. Model + Footprint + Category
-                    if not matched_id and row_data['Comment'] and row_data['Footprint']:
-                        found = db.execute('''
-                            SELECT id FROM components 
-                            WHERE model = ? AND footprint = ? 
-                            ORDER BY 
-                            CASE 
-                                WHEN primary_category = ? AND secondary_category = ? THEN 1
-                                WHEN primary_category = ? THEN 2
-                                ELSE 3
-                            END
-                            LIMIT 1
-                        ''', (row_data['Comment'], row_data['Footprint'], 
-                              row_data['Primary Category'], row_data['Secondary Category'], 
-                              row_data['Primary Category'])).fetchone()
-                        if found: matched_id = found['id']
-
-                    # 3. Model Only (Backup)
-                    if not matched_id and row_data['Comment']:
-                        found = db.execute('SELECT id FROM components WHERE model = ? ORDER BY id LIMIT 1', (row_data['Comment'],)).fetchone()
-                        if found:  matched_id = found['id']
+                    # Smart Matching Logic
+                    matched_id = find_best_match(row_data, all_comps_smart, special_rules)
 
                     # Save this initial match to DB
                     # We store the raw CSV row data as JSON-like string for display in future
@@ -891,6 +1192,31 @@ def stats():
     reserved_value = convert_from_base(reserved_value_base, g.lang)
     
     return render_template('stats.html', stats=stats_data, total_value=total_value, used_value=used_value, reserved_value=reserved_value)
+
+@app.route('/api/component/<int:comp_id>/history')
+def component_history(comp_id):
+    db = get_db()
+    # Join with bom_files to get the name
+    transactions = db.execute('''
+        SELECT 
+            t.change_amount, t.timestamp, t.note, t.bom_file_id, 
+            b.display_name as bom_name
+        FROM transactions t
+        LEFT JOIN bom_files b ON t.bom_file_id = b.id
+        WHERE t.component_id = ?
+        ORDER BY t.timestamp DESC
+    ''', (comp_id,)).fetchall()
+    
+    data = []
+    for t in transactions:
+        data.append({
+            'amount': t['change_amount'],
+            'date': t['timestamp'],
+            'note': t['note'],
+            'bom_id': t['bom_file_id'],
+            'bom_name': t['bom_name']
+        })
+    return jsonify(data)
 
 if __name__ == '__main__':
     app.run(debug=True)

@@ -15,23 +15,24 @@ body {
 }
 
 .sidebar {
-    width: 250px;
-    min-width: 250px; /* Ensure sidebar doesn't shrink below this unless collapsed */
+    width: 260px;
     background-color: #2c3e50;
     color: white;
     padding: 20px 0;
-    position: sticky;
+    position: fixed;
+    left: 0;
     top: 0;
+    bottom: 0;
     height: 100vh;
     overflow-y: auto;
     overflow-x: hidden;
-    transition: width 0.3s ease, min-width 0.3s ease;
+    transition: width 0.3s ease;
     white-space: nowrap;
+    z-index: 100;
 }
 
 .sidebar.collapsed {
     width: 60px;
-    min-width: 60px;
 }
 
 .logo {
@@ -114,6 +115,12 @@ body {
 .content {
     flex: 1;
     padding: 40px;
+    margin-left: 260px;
+    transition: margin-left 0.3s ease;
+}
+
+.sidebar.collapsed + .content {
+    margin-left: 60px;
 }
 
 .flashes {
@@ -159,6 +166,7 @@ th {
 .btn-danger { background-color: #e74c3c; color: white; }
 .btn-success { background-color: #2ecc71; color: white; }
 .btn-secondary { background-color: #95a5a6; color: white; }
+.btn-info { background-color: #17a2b8; color: white; }
 
 .form-group {
     margin-bottom: 15px;

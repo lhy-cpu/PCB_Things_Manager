@@ -1,0 +1,246 @@
+[
+    {
+        "description": "Example Rule: Map old resistor name to standard",
+        "criteria": {
+            "Comment": "Res_Old_10k"
+        },
+        "target": {
+            "model": "Resistor 10k",
+            "footprint": "0603"
+        }
+    },
+    {
+        "description": "Example Rule: Map specific supplier part to internal part",
+        "criteria": {
+            "Supplier Part": "DK-12345"
+        },
+        "target": {
+            "supplier_part": "Internal-123"
+        },
+        "use_smart_detect": true
+    },
+    {
+        "description": "LED 0603 White",
+        "criteria": {
+            "model": [
+                "KT-0603W",
+                "NCD0603W1",
+                "NCD0603W3",
+                "NCD0603W4",
+                "NCD0603W5",
+                "NCD0603W1-XA",
+                "GL0603UW01",
+                "XL-1608UWC-04",
+                "XL-1608UWC-06A"
+            ],
+            "footprint": "0603"
+        },
+        "target": {
+            "model": "LED 白色",
+            "footprint": "0603"
+        },
+        "use_smart_detect": true
+    },
+    {
+        "description": "LED 0603 Warm-white",
+        "use_smart_detect": true,
+        "criteria": {
+            "footprint": "0603",
+            "model": [
+                "NCD0603W6"
+            ]
+        },
+        "target": {
+            "footprint": "0603",
+            "model": "LED 暖白色"
+        }
+    },
+    {
+        "description": "LED 0603 Yellow",
+        "criteria": {
+            "model": [
+                "KT-0603Y",
+                "NCD0603Y1",
+                "NCD0603Y2",
+                "NCD0603Y3-F",
+                "NCD0603Y4",
+                "NCD0603Y5",
+                "GL0603UY01",
+                "LTST-C191KSKT",
+                "LTST-C190KSKT",
+                "LTST-C190YKT",
+                "19-213/Y2C-CQ2R2L/3T(CY)",
+                "XL-1608UYC-06"
+            ],
+            "footprint": "0603"
+        },
+        "target": {
+            "model": "LED 黄色",
+            "footprint": "0603"
+        },
+        "use_smart_detect": true
+    },
+    {
+        "description": "LED 0603 Red",
+        "criteria": {
+            "model": [
+                "KT-0603R",
+                "NCD0603R1",
+                "NCD0603R2",
+                "NCD0603R3",
+                "NCD0603R5",
+                "NCD0603R6",
+                "GL0603UR01",
+                "XL-1608SURC-06",
+                "19-217/R6C-AL1M2VY/6T",
+                "SZYY0603R",
+                "LTST-C193KRKT-5A",
+                "XL-1608SURC-04",
+                "XL-1608SURC-06FJ",
+                "MHT192CRCT",
+                "F.0603.00139/P2-0603R1TS2-06T-002"
+            ],
+            "footprint": "0603"
+        },
+        "target": {
+            "model": "LED 红色",
+            "footprint": "0603"
+        },
+        "use_smart_detect": true
+    },
+    {
+        "description": "LED 0603 Green",
+        "criteria": {
+            "model": [
+                "KT-0603G",
+                "NCD0603G1",
+                "NCD0603G2",
+                "NCD0603G3",
+                "GL0603UG01",
+                "XL-1608UGC-04",
+                "19-217/GHC-YR1S2/6T",
+                "A-SP192DGHC-C01-4T",
+                "XL-1608PGC-06",
+                "F.0603.00025/P2-0603G1TS2-06T-002",
+                "SZYY0603G",
+                "TZ-P2-0603GTCS1-0.6T",
+                "XL-1608UGC-06A",
+                "TJ-S1608SW6TGLC2G-A5",
+                "TJ-S1706SW6TGLC2G-A5"
+            ],
+            "footprint": "0603"
+        },
+        "target": {
+            "model": "LED 绿色",
+            "footprint": "0603"
+        },
+        "use_smart_detect": true
+    },
+    {
+        "description": "LED 0603 Blue",
+        "criteria": {
+            "model": [
+                "KT-0603B",
+                "NCD0603B1",
+                "NCD0603B3",
+                "NCD0603B4",
+                "NCD0603B5",
+                "GL0603UB01",
+                "XL-1608UBC-04",
+                "SZYY0603B",
+                "19-217/BHC-ZL1M2RY/6T"
+            ],
+            "footprint": "0603"
+        },
+        "target": {
+            "model": "LED 蓝色",
+            "footprint": "0603"
+        },
+        "use_smart_detect": true
+    },
+    {
+        "description": "LED 0603 Yellow-green",
+        "criteria": {
+            "model": [
+                "NCD0603C1",
+                "NCD0603C2",
+                "NCD0603C3",
+                "NCD0603C4",
+                "NCD0603C5-F",
+                "GL0603YG01",
+                "XL-1608SYGC-06",
+                "XL-1608SYGC-04"
+            ],
+            "footprint": "0603"
+        },
+        "target": {
+            "model": "LED 黄绿色",
+            "footprint": "0603"
+        },
+        "use_smart_detect": true
+    },
+    {
+        "description": "LED 0603 Orange",
+        "criteria": {
+            "model": [
+                "KT-0603O",
+                "NCD0603O1",
+                "NCD0603O2",
+                "NCD0603O3",
+                "GL0603UO01",
+                "XL-1608UOC-06"
+            ],
+            "footprint": "0603"
+        },
+        "target": {
+            "model": "LED 橙色",
+            "footprint": "0603"
+        },
+        "use_smart_detect": true
+    },
+    {
+        "description": "LED 0603 Ice-blue",
+        "criteria": {
+            "model": [
+                "NCD0603A1",
+                "MHT192WDT-ICE"
+            ],
+            "footprint": "0603"
+        },
+        "target": {
+            "model": "LED 冰蓝色",
+            "footprint": "0603"
+        },
+        "use_smart_detect": true
+    },
+    {
+        "description": "LED 0603 Pink",
+        "criteria": {
+            "model": [
+                "GL0603UP01",
+                "XL-1608UPC-06"
+            ],
+            "footprint": "0603"
+        },
+        "target": {
+            "model": "LED 粉色",
+            "footprint": "0603"
+        },
+        "use_smart_detect": true
+    },
+    {
+        "description": "LED 0603 Purple",
+        "criteria": {
+            "model": [
+                "GL0603PU01",
+                "XL-1608UVC-04"
+            ],
+            "footprint": "0603"
+        },
+        "target": {
+            "model": "LED 紫色",
+            "footprint": "0603"
+        },
+        "use_smart_detect": true
+    }
+]

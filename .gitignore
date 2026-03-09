@@ -1,2 +1,3 @@
 venv/*
-dataset/*
+dataset/csv_files/*
+dataset/inventory.sqlite

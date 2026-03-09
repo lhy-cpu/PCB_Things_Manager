@@ -113,7 +113,7 @@
                     <form method="POST" style="display:inline;">
                         <input type="hidden" name="component_id" value="{{ c.id }}">
                         <input type="number" name="change_amount" placeholder="+/-" style="width: 60px" required>
-                        <input type="text" name="note" placeholder="Reason" style="width: 100px">
+                        <input type="text" name="note" placeholder="{{ _('ph_reason', 'Reason') }}" style="width: 100px">
                         <button type="submit" name="update_stock" class="btn btn-secondary btn-sm">{{ _('btn_update', 'Update') }}</button>
                     </form>
                 </td>

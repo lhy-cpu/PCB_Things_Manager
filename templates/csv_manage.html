@@ -123,7 +123,7 @@
                     </form>
                 </td>
                 <td>{{ f.filename }}</td>
-                <td>{{ f.upload_date }}</td>
+                <td><span class="utc-date">{{ f.upload_date }}</span></td>
                 <td>
                     <div style="display: flex; gap: 5px; align-items: center;">
                         <a href="{{ url_for('bom_match', file_id=f.id) }}" class="btn btn-success">{{ _('btn_view_checkout', 'View & Checkout') }}</a>

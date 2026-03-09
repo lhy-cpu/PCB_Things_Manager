@@ -15,14 +15,17 @@
 *   **💰 Cost Calculation**: Supports multi-currency (CNY/USD/EUR) exchange rates, automatic unit price and total value calculation.
 *   **🏷️ Categorization**: Create custom primary and secondary categories to organize your library.
 *   **📄 BOM (Bill of Materials) Management**:
+    *   **Smart Matching**: Customize special matching rules to improve component identification.
+    *   **Rules Management**: New special rules management page, supporting JSON rules CRUD, Import/Export.
     *   **Drag & Drop** upload for CSV/BOM files.
     *   Automatically match BOM components with existing inventory.
     *   Quickly identify missing parts and one-click stock deduction.
 *   **🖥️ Modern UI/UX**:
     *   **Toast Notifications** for instant feedback.
     *   **Edit in Place** without page refresh.
-    *   Collapsible sidebar that remembers user preference.
+    *   **Fixed Sidebar**: Stays fixed while scrolling, collapsible with user preference memory.
     *   Fully integrated with FontAwesome icons.
+    *   **UTC Time Support**: Backend unified UTC storage, Frontend automatic local time conversion.
 *   **📊 Statistics Dashboard**: Overview of total inventory value, component count, and category distribution.
 *   **🌍 Multi-language**: Built-in support for **English**, **Chinese (Simplified)**, and **German**. Switch language in Settings.
 *   **🔒 Local Deployment**: All static assets hosted locally. No CDN dependencies, fully offline capable.
@@ -77,6 +80,7 @@
     *   `locales/`: Stores `en.json`, `zh.json`, `de.json` translation files.
 *   `dataset/`: Data storage directory.
     *   `inventory.sqlite`: SQLite database file (automatically created on first run).
+    *   `special_rules.json`: Stores special matching rules.
     *   `csv_files/`: User-uploaded BOM CSV files.
 
 ## 📝 License
