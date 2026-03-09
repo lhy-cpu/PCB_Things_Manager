@@ -42,7 +42,7 @@
 1.  **克隆仓库**
 
     ```bash
-    git clone https://github.com/yourusername/PCB_Things_Manager.git
+    git clone https://github.com/lhy-cpu/PCB_Things_Manager.git
     cd PCB_Things_Manager
     ```
 
